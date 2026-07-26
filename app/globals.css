@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   全局样式 - 深色科技蓝主题
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: #0B1220;
+  color: #F1F5F9;
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0B1220;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* 选中文本颜色 */
+::selection {
+  background: rgba(59, 130, 246, 0.4);
+  color: #F1F5F9;
+}
+
+/* ============================================================
+   通用组件类
+   ============================================================ */
+
+@layer components {
+  /* 主按钮 - 电光蓝渐变 */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-primary-600 to-primary-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-primary-600/20 transition-all hover:from-primary-500 hover:to-primary-400 hover:shadow-primary-500/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* 次按钮 - 描边 */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-border-subtle bg-bg-surface px-4 py-2 text-sm font-medium text-text-secondary transition-all hover:border-primary-500 hover:text-primary-300 active:scale-[0.98];
+  }
+
+  /* VIP 金色按钮 */
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-gold-500 to-gold-400 px-4 py-2 text-sm font-semibold text-bg-base shadow-lg shadow-gold-500/30 transition-all hover:from-gold-400 hover:to-gold-300 active:scale-[0.98];
+  }
+
+  /* 危险按钮 */
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-danger/10 px-3 py-1.5 text-sm font-medium text-danger transition-all hover:bg-danger hover:text-white active:scale-[0.98];
+  }
+
+  /* 输入框 */
+  .input-field {
+    @apply w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary placeholder-text-dim transition-colors focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500;
+  }
+
+  /* 卡片 */
+  .card {
+    @apply rounded-2xl border border-border bg-bg-surface shadow-xl shadow-black/20;
+  }
+
+  /* VIP 金色边框卡片 */
+  .card-gold {
+    @apply rounded-2xl border-2 border-gold-400/60 bg-bg-surface shadow-xl shadow-gold-500/10;
+  }
+
+  /* 标签 */
+  .tag {
+    @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium;
+  }
+
+  .tag-software {
+    @apply bg-primary-500/15 text-primary-300;
+  }
+
+  .tag-movie {
+    @apply bg-purple-500/15 text-purple-300;
+  }
+
+  .tag-vip {
+    @apply bg-gold-500/15 text-gold-300;
+  }
+
+  /* 链接 */
+  .link {
+    @apply text-primary-400 transition-colors hover:text-primary-300;
+  }
+
+  /* 标题 */
+  .section-title {
+    @apply text-xl font-bold text-text-primary;
+  }
+}
+
+/* ============================================================
+   动画
+   ============================================================ */
+
+/* 骨架屏 shimmer 效果 */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(30, 41, 59, 0.4) 25%,
+    rgba(51, 65, 85, 0.6) 50%,
+    rgba(30, 41, 59, 0.4) 75%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+/* VIP 金色脉冲 */
+.vip-glow {
+  box-shadow: 0 0 12px rgba(245, 194, 66, 0.4), 0 0 24px rgba(245, 194, 66, 0.2);
+}
+
+/* 渐入动画 */
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* 上滑渐入 */
+.slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

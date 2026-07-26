@@ -1,0 +1,97 @@
+/**
+ * 帖子主体展示卡片（封面/标题/标签/作者/简介）
+ * 纯展示组件，由 PostDetailClient 调用
+ */
+
+import { Eye, MessageCircle, Pin, Crown } from 'lucide-react';
+import type { PostDetail } from '@/lib/types';
+import { CATEGORY_LABELS } from '@/lib/types';
+import { formatDateTime, formatRelativeTime } from '@/lib/utils';
+
+interface PostHeaderProps {
+  post: PostDetail;
+}
+
+export default function PostHeader({ post }: PostHeaderProps) {
+  const categoryLabel = CATEGORY_LABELS[post.category];
+
+  return (
+    <div className="card overflow-hidden">
+      {/* 封面 */}
+      <div className="relative w-full bg-bg-elevated">
+        {post.cover_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={post.cover_url}
+            alt={post.title}
+            className="max-h-96 w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-48 w-full items-center justify-center bg-gradient-to-br from-primary-600/30 via-primary-700/20 to-bg-surface">
+            <span className="text-sm text-text-dim">{categoryLabel}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="p-6">
+        {/* 标题 */}
+        <h1 className="text-3xl font-bold text-text-primary">{post.title}</h1>
+
+        {/* 标签行 */}
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-text-dim">
+          <span className={`tag ${post.category === 'software' ? 'tag-software' : 'tag-movie'}`}>
+            {categoryLabel}
+          </span>
+          {post.is_top && (
+            <span className="tag bg-danger/20 text-danger">
+              <Pin size={10} /> 置顶
+            </span>
+          )}
+          {post.is_vip && (
+            <span className="tag tag-vip">
+              <Crown size={10} /> VIP
+            </span>
+          )}
+          <span className="flex items-center gap-1">
+            <Eye size={12} /> {post.view_count}
+          </span>
+          <span className="flex items-center gap-1">
+            <MessageCircle size={12} /> {post.comment_count}
+          </span>
+          <span>· {formatDateTime(post.created_at)}</span>
+        </div>
+
+        {/* 作者 */}
+        <div className="mt-4 flex items-center gap-3">
+          {post.author_avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={post.author_avatar}
+              alt={post.author_nickname}
+              className="h-10 w-10 rounded-full object-cover"
+            />
+          ) : (
+            <div className="grid h-10 w-10 place-items-center rounded-full bg-primary-500/20 text-sm text-primary-300">
+              {(post.author_nickname || 'U').charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <div className="text-sm font-medium text-text-primary">
+              {post.author_nickname || '匿名'}
+            </div>
+            <div className="text-xs text-text-dim">
+              {formatRelativeTime(post.created_at)} 发布
+            </div>
+          </div>
+        </div>
+
+        {/* 简介 */}
+        {post.description && (
+          <div className="mt-5 whitespace-pre-wrap break-words text-sm leading-relaxed text-text-secondary">
+            {post.description}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
