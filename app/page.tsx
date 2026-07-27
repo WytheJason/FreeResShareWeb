@@ -71,47 +71,58 @@ interface QueryOptions {
  * 列表数据对网盘链接与提取码进行脱敏
  */
 async function queryPosts(opts: QueryOptions): Promise<PageResult<Post>> {
-  const supabase = await getSupabaseServer();
   const { page, pageSize, category, keyword, sort = 'latest' } = opts;
 
-  let query = supabase
-    .from('posts')
-    .select(
-      'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, author:user_profile!posts_author_id_fkey(nickname, avatar)',
-      { count: 'exact' }
-    )
-    .eq('status', 'normal');
+  let data: PostRow[] | null = null;
+  let count: number | null = null;
 
-  // 分类过滤
-  if (category) {
-    query = query.eq('category', category);
+  try {
+    const supabase = await getSupabaseServer();
+    let query = supabase
+      .from('posts')
+      .select(
+        'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, author:user_profile!posts_author_id_fkey(nickname, avatar)',
+        { count: 'exact' }
+      )
+      .eq('status', 'normal');
+
+    // 分类过滤
+    if (category) {
+      query = query.eq('category', category);
+    }
+
+    // 关键词模糊搜索（转义 % _ \）
+    if (keyword) {
+      const escaped = keyword.replace(/[%_\\]/g, '\\$&');
+      query = query.ilike('title', `%${escaped}%`);
+    }
+
+    // 排序
+    if (sort === 'hot') {
+      query = query
+        .order('hot_weight', { ascending: false })
+        .order('view_count', { ascending: false })
+        .order('comment_count', { ascending: false });
+    } else if (sort === 'top') {
+      query = query
+        .order('is_top', { ascending: false })
+        .order('created_at', { ascending: false });
+    } else {
+      query = query.order('created_at', { ascending: false });
+    }
+
+    // 分页
+    const { from, to } = calcPageRange(page, pageSize);
+    query = query.range(from, to);
+
+    const res = await query;
+    data = res.data as unknown as PostRow[] | null;
+    count = res.count;
+  } catch {
+    // 数据库连接失败（网络/表未建）时优雅降级，返回空列表
+    data = null;
+    count = null;
   }
-
-  // 关键词模糊搜索（转义 % _ \）
-  if (keyword) {
-    const escaped = keyword.replace(/[%_\\]/g, '\\$&');
-    query = query.ilike('title', `%${escaped}%`);
-  }
-
-  // 排序
-  if (sort === 'hot') {
-    query = query
-      .order('hot_weight', { ascending: false })
-      .order('view_count', { ascending: false })
-      .order('comment_count', { ascending: false });
-  } else if (sort === 'top') {
-    query = query
-      .order('is_top', { ascending: false })
-      .order('created_at', { ascending: false });
-  } else {
-    query = query.order('created_at', { ascending: false });
-  }
-
-  // 分页
-  const { from, to } = calcPageRange(page, pageSize);
-  query = query.range(from, to);
-
-  const { data, count } = await query;
   const total = count ?? 0;
 
   const list: Post[] = ((data ?? []) as unknown as PostRow[]).map((item) => {

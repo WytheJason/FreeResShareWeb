@@ -106,7 +106,10 @@ export default async function UserPage({
   params: { id: string };
   searchParams: { tab?: string; page?: string };
 }) {
-  const supabase = await getSupabaseServer();
+  const supabase = await getSupabaseServer().catch(() => null);
+  if (!supabase) {
+    notFound();
+  }
   const currentUser = await getCurrentUser();
   const isOwner = !!currentUser && currentUser.id === params.id;
 

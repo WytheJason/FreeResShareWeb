@@ -1,15 +1,6 @@
 {
-  "version": 2,
   "framework": "nextjs",
-  "buildCommand": "next build",
-  "installCommand": "npm install",
-  "devCommand": "next dev",
   "regions": ["hkg1"],
-  "functions": {
-    "app/api/**/route.ts": {
-      "maxDuration": 10
-    }
-  },
   "headers": [
     {
       "source": "/api/(.*)",

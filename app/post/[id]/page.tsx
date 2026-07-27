@@ -88,7 +88,10 @@ export default async function PostDetailPage({
 }: {
   params: { id: string };
 }) {
-  const supabase = await getSupabaseServer();
+  const supabase = await getSupabaseServer().catch(() => null);
+  if (!supabase) {
+    notFound();
+  }
 
   // ---------- 1. 查询帖子 ----------
   const { data: rawData, error } = await supabase
