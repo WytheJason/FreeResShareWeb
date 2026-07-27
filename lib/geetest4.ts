@@ -104,9 +104,12 @@ export class Geetest4Provider implements CaptchaProvider {
 
       clearTimeout(timeout);
 
+      const responseText = await response.text();
       console.log('[Geetest4] 极验响应', {
         status: response.status,
         statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        rawBody: responseText.slice(0, 500),
       });
 
       if (!response.ok) {
@@ -114,15 +117,23 @@ export class Geetest4Provider implements CaptchaProvider {
         return { pass: false, reason: `极验服务端 HTTP ${response.status}` };
       }
 
-      const data = (await response.json()) as { result?: string; reason?: string };
+      let data: { result?: string; reason?: string; code?: string | number; [key: string]: unknown } = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error('[Geetest4] 响应非 JSON', responseText);
+        return { pass: false, reason: '极验服务端返回格式异常' };
+      }
+
       console.log('[Geetest4] 极验返回', data);
 
       if (data.result === 'success') {
         return { pass: true };
       }
 
-      console.warn('[Geetest4] 校验失败 reason=', data.reason);
-      return { pass: false, reason: data.reason || '极验校验未通过' };
+      const reason = data.reason || data.code || '';
+      console.warn('[Geetest4] 校验失败', { result: data.result, reason, fullResponse: data });
+      return { pass: false, reason: reason ? String(reason) : '极验校验未通过' };
     } catch (error) {
       console.error('[Geetest4] 校验异常', error);
       return { pass: false, reason: '极验服务端连接异常' };
