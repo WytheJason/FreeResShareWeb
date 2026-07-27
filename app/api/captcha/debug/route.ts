@@ -14,7 +14,10 @@ export async function GET() {
 
   // 调用一次 getCaptchaProvider 触发日志输出（便于在 Vercel Logs 中看到）
   const provider = getCaptchaProvider();
-  const providerName = provider.constructor.name;
+  const providerName =
+    'providerName' in provider
+      ? (provider as { providerName: string }).providerName
+      : provider.constructor.name;
 
   // 模拟一次假票据校验，触发对极验服务端的实际请求（便于在 Vercel Logs 中看到 HTTP 响应）
   let fakeVerifyResult: string | null = null;

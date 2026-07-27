@@ -39,6 +39,10 @@ export interface CaptchaProvider {
  * 5. 极验返回 result: "success" 即通过
  */
 export class Geetest4Provider implements CaptchaProvider {
+  /** Provider 唯一标识（不受生产构建压缩影响） */
+  static readonly providerName = 'Geetest4Provider';
+  readonly providerName = Geetest4Provider.providerName;
+
   private readonly captchaId: string;
   private readonly captchaKey: string;
   /** 极验四代服务端校验接口 */
@@ -151,6 +155,9 @@ export class Geetest4Provider implements CaptchaProvider {
  * 生产环境必须配置真实密钥，否则视为不安全
  */
 export class MockCaptchaProvider implements CaptchaProvider {
+  static readonly providerName = 'MockCaptchaProvider';
+  readonly providerName = MockCaptchaProvider.providerName;
+
   async verifyTicket(_ticket: CaptchaTicket): Promise<boolean> {
     console.warn('[Captcha] 使用 Mock Provider，跳过验证码校验。请确认生产环境已配置极验密钥。');
     return true;
@@ -176,12 +183,14 @@ export function getCaptchaProvider(): CaptchaProvider {
   const captchaKey = process.env.GEETEST_CAPTCHA_KEY;
 
   if (captchaId && captchaKey) {
+    const provider = new Geetest4Provider(captchaId, captchaKey);
     console.log('[Captcha] 使用 Geetest4Provider', {
       captchaId,
       keyLen: captchaKey.length,
+      keyPreview: `${captchaKey.slice(0, 4)}...${captchaKey.slice(-4)}`,
       idSource: process.env.GEETEST_CAPTCHA_ID ? 'GEETEST_CAPTCHA_ID' : 'NEXT_PUBLIC_GEETEST_CAPTCHA_ID',
     });
-    return new Geetest4Provider(captchaId, captchaKey);
+    return provider;
   }
 
   console.warn('[Captcha] 使用 MockCaptchaProvider', {
