@@ -21,7 +21,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { getSupabaseBrowser } from '@/lib/supabase';
-import { isValidPanCode } from '@/lib/utils';
+import { isValidPanCode, isValidCaptchaTicket } from '@/lib/utils';
 import type {
   PostCategory,
   PanType,
@@ -174,7 +174,7 @@ export default function PublishPage() {
     }
 
     // 2. 极验校验
-    if (!captcha || !captcha.lot_number) {
+    if (!isValidCaptchaTicket(captcha)) {
       toast.show('error', '请先完成人机验证');
       return;
     }

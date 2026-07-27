@@ -165,6 +165,23 @@ export function isValidPanCode(code: string): boolean {
   return /^[a-zA-Z0-9]{0,8}$/.test(code.trim());
 }
 
+/**
+ * 极验四代票据完整性校验
+ * 四元组 lot_number / captcha_output / pass_token / gen_time 必须全部为非空字符串
+ * 用于前端提交前的快速拦截，避免不完整票据打到后端
+ */
+export function isValidCaptchaTicket(
+  ticket: { lot_number?: string; captcha_output?: string; pass_token?: string; gen_time?: string } | null | undefined
+): boolean {
+  if (!ticket) return false;
+  return !!(
+    ticket.lot_number &&
+    ticket.captcha_output &&
+    ticket.pass_token &&
+    ticket.gen_time
+  );
+}
+
 // ============ 6. 响应工具 ============
 
 /**

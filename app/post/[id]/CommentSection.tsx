@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { X, Send } from 'lucide-react';
 import type { Comment, PageResult, CaptchaTicket, UserProfile } from '@/lib/types';
+import { isValidCaptchaTicket } from '@/lib/utils';
 import CommentTree from '@/components/CommentTree';
 import GeetestWidget from '@/components/GeetestWidget';
 import Pagination from '@/components/Pagination';
@@ -71,7 +72,7 @@ export default function CommentSection({
       toast.show('error', '请输入评论内容');
       return;
     }
-    if (!captcha) {
+    if (!isValidCaptchaTicket(captcha)) {
       toast.show('error', '请先完成人机验证');
       return;
     }

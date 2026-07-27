@@ -169,13 +169,17 @@ export class MockCaptchaProvider implements CaptchaProvider {
  * 切换其他服务商时，仅修改此处即可
  */
 export function getCaptchaProvider(): CaptchaProvider {
-  const captchaId = process.env.NEXT_PUBLIC_GEETEST_CAPTCHA_ID;
+  // 后端优先使用纯服务端变量 GEETEST_CAPTCHA_ID（不暴露给前端，更安全）
+  // 回退到 NEXT_PUBLIC_GEETEST_CAPTCHA_ID（前端共用变量，向后兼容）
+  const captchaId =
+    process.env.GEETEST_CAPTCHA_ID || process.env.NEXT_PUBLIC_GEETEST_CAPTCHA_ID;
   const captchaKey = process.env.GEETEST_CAPTCHA_KEY;
 
   if (captchaId && captchaKey) {
     console.log('[Captcha] 使用 Geetest4Provider', {
       captchaId,
       keyLen: captchaKey.length,
+      idSource: process.env.GEETEST_CAPTCHA_ID ? 'GEETEST_CAPTCHA_ID' : 'NEXT_PUBLIC_GEETEST_CAPTCHA_ID',
     });
     return new Geetest4Provider(captchaId, captchaKey);
   }
@@ -183,6 +187,7 @@ export function getCaptchaProvider(): CaptchaProvider {
   console.warn('[Captcha] 使用 MockCaptchaProvider', {
     hasCaptchaId: !!captchaId,
     hasCaptchaKey: !!captchaKey,
+    hint: '请检查 Vercel 环境变量 GEETEST_CAPTCHA_ID 和 GEETEST_CAPTCHA_KEY 是否已配置 Production 环境',
   });
   return new MockCaptchaProvider();
 }
@@ -192,5 +197,7 @@ export function getCaptchaProvider(): CaptchaProvider {
  * 用于前端提示开发者配置密钥
  */
 export function isCaptchaConfigured(): boolean {
-  return !!(process.env.NEXT_PUBLIC_GEETEST_CAPTCHA_ID && process.env.GEETEST_CAPTCHA_KEY);
+  const captchaId =
+    process.env.GEETEST_CAPTCHA_ID || process.env.NEXT_PUBLIC_GEETEST_CAPTCHA_ID;
+  return !!(captchaId && process.env.GEETEST_CAPTCHA_KEY);
 }

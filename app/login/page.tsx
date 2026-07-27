@@ -18,6 +18,7 @@ import {
   isValidEmail,
   isValidPassword,
   isValidNickname,
+  isValidCaptchaTicket,
 } from '@/lib/utils';
 import type { CaptchaTicket } from '@/lib/types';
 import { useToast } from '@/components/Toast';
@@ -129,7 +130,7 @@ export default function LoginPage() {
       toast.show('error', '昵称格式不正确（1-20 位中英文数字下划线）');
       return;
     }
-    if (!captcha || !captcha.lot_number) {
+    if (!isValidCaptchaTicket(captcha)) {
       toast.show('error', '请先完成人机验证');
       return;
     }

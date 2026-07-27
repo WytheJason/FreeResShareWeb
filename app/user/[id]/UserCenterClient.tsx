@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Edit, Mail, X, Send } from 'lucide-react';
 import type { Post, UserProfile, CaptchaTicket, PageResult } from '@/lib/types';
-import { formatRegisterDuration, formatRelativeTime } from '@/lib/utils';
+import { formatRegisterDuration, formatRelativeTime, isValidCaptchaTicket } from '@/lib/utils';
 import PostCard from '@/components/PostCard';
 import Pagination from '@/components/Pagination';
 import Empty from '@/components/Empty';
@@ -80,7 +80,7 @@ export default function UserCenterClient({
       toast.show('error', '请输入昵称');
       return;
     }
-    if (!editCaptcha) {
+    if (!isValidCaptchaTicket(editCaptcha)) {
       toast.show('error', '请先完成人机验证');
       return;
     }
