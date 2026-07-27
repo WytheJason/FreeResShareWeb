@@ -116,10 +116,18 @@ async function queryPosts(opts: QueryOptions): Promise<PageResult<Post>> {
     query = query.range(from, to);
 
     const res = await query;
-    data = res.data as unknown as PostRow[] | null;
-    count = res.count;
-  } catch {
-    // 数据库连接失败（网络/表未建）时优雅降级，返回空列表
+    if (res.error) {
+      // Supabase 返回错误（表未建/RLS/网络）时优雅降级
+      console.error('[HomePage] query error:', res.error.message);
+      data = null;
+      count = null;
+    } else {
+      data = res.data as unknown as PostRow[] | null;
+      count = res.count;
+    }
+  } catch (e) {
+    // 数据库连接异常（网络/环境变量缺失）时优雅降级，返回空列表
+    console.error('[HomePage] DB exception:', e);
     data = null;
     count = null;
   }
