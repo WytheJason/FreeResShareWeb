@@ -61,9 +61,23 @@ export class Geetest4Provider implements CaptchaProvider {
       !ticket.pass_token ||
       !ticket.gen_time
     ) {
-      console.warn('[Geetest4] 票据参数不完整', ticket);
+      console.warn('[Geetest4] 票据参数不完整', {
+        has_lot: !!ticket.lot_number,
+        has_output: !!ticket.captcha_output,
+        has_token: !!ticket.pass_token,
+        has_gen_time: !!ticket.gen_time,
+      });
       return false;
     }
+
+    console.log('[Geetest4] 开始校验', {
+      captchaId: this.captchaId,
+      lot_number: ticket.lot_number,
+      gen_time: ticket.gen_time,
+      // 只输出长度和前几位，避免泄露完整票据
+      output_len: ticket.captcha_output.length,
+      token_len: ticket.pass_token.length,
+    });
 
     // 极验四代校验签名：Wgt5d (MD5(lot_number + captcha_output + pass_token + gen_time + captchaKey))
     const signStr =
@@ -87,17 +101,25 @@ export class Geetest4Provider implements CaptchaProvider {
       captcha_id: this.captchaId,
     });
 
+    const requestUrl = `${this.verifyUrl}?${params.toString()}`;
+    console.log('[Geetest4] 请求极验服务端', this.verifyUrl);
+
     try {
       // 设置 5 秒超时，防止极验服务异常拖垮接口
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
 
-      const response = await fetch(`${this.verifyUrl}?${params.toString()}`, {
+      const response = await fetch(requestUrl, {
         method: 'GET',
         signal: controller.signal,
       });
 
       clearTimeout(timeout);
+
+      console.log('[Geetest4] 极验响应', {
+        status: response.status,
+        statusText: response.statusText,
+      });
 
       if (!response.ok) {
         console.error('[Geetest4] HTTP 错误', response.status, response.statusText);
@@ -105,13 +127,14 @@ export class Geetest4Provider implements CaptchaProvider {
       }
 
       const data = (await response.json()) as { result?: string; reason?: string };
+      console.log('[Geetest4] 极验返回', data);
 
       // 极验返回 result: "success" 表示验证通过
       if (data.result === 'success') {
         return true;
       }
 
-      console.warn('[Geetest4] 校验失败', data.reason);
+      console.warn('[Geetest4] 校验失败 reason=', data.reason);
       return false;
     } catch (error) {
       console.error('[Geetest4] 校验异常', error);
@@ -150,9 +173,17 @@ export function getCaptchaProvider(): CaptchaProvider {
   const captchaKey = process.env.GEETEST_CAPTCHA_KEY;
 
   if (captchaId && captchaKey) {
+    console.log('[Captcha] 使用 Geetest4Provider', {
+      captchaId,
+      keyLen: captchaKey.length,
+    });
     return new Geetest4Provider(captchaId, captchaKey);
   }
 
+  console.warn('[Captcha] 使用 MockCaptchaProvider', {
+    hasCaptchaId: !!captchaId,
+    hasCaptchaKey: !!captchaKey,
+  });
   return new MockCaptchaProvider();
 }
 
