@@ -29,7 +29,7 @@ export async function GET() {
       gen_time: '20260101',
     };
     const result = await provider.verifyTicket(fakeTicket as never);
-    fakeVerifyResult = result ? 'true' : 'false';
+    fakeVerifyResult = result.pass ? 'true' : `false (reason: ${result.reason || 'unknown'})`;
   } catch (e) {
     fakeVerifyResult = 'exception: ' + (e instanceof Error ? e.message : String(e));
   }

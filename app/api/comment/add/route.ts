@@ -50,9 +50,10 @@ export async function POST(request: Request) {
       });
     }
     const provider = getCaptchaProvider();
-    const verified = await provider.verifyTicket(captcha);
-    if (!verified) {
-      return NextResponse.json(errorResponse('人机验证失败', 403), {
+    const result = await provider.verifyTicket(captcha);
+    if (!result.pass) {
+      const reason = result.reason ? `人机验证失败：${result.reason}` : '人机验证失败';
+      return NextResponse.json(errorResponse(reason, 403), {
         status: HTTP_STATUS.FORBIDDEN,
       });
     }

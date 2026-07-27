@@ -25,10 +25,10 @@ export async function POST(request: Request) {
     }
 
     const provider = getCaptchaProvider();
-    const verified = await provider.verifyTicket(ticket);
+    const result = await provider.verifyTicket(ticket);
 
     return NextResponse.json(
-      successResponse({ verified }, verified ? '校验通过' : '校验失败'),
+      successResponse({ verified: result.pass, reason: result.reason }, result.pass ? '校验通过' : `校验失败：${result.reason || '未知原因'}`),
       { status: HTTP_STATUS.OK }
     );
   } catch (error) {

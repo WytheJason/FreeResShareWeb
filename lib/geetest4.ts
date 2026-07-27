@@ -13,6 +13,11 @@ import type { CaptchaTicket } from './types';
 
 // ============ 抽象接口（业务层依赖此接口）============
 
+export interface VerifyResult {
+  pass: boolean;
+  reason?: string;
+}
+
 /**
  * 验证码服务商抽象接口
  * 业务接口仅依赖此接口，不直接依赖极验实现
@@ -21,31 +26,19 @@ export interface CaptchaProvider {
   /**
    * 校验前端提交的验证票据
    * @param ticket 前端极验组件返回的票据四元组
-   * @returns true=校验通过，false=校验失败
+   * @returns pass=true 校验通过，pass=false 校验失败，reason 为失败原因
    */
-  verifyTicket(ticket: CaptchaTicket): Promise<boolean>;
+  verifyTicket(ticket: CaptchaTicket): Promise<VerifyResult>;
 }
 
 // ============ 极验 GeeTest 4 实现 ============
 
-/**
- * 极验四代验证码实现
- *
- * 接入流程：
- * 1. 前端通过 gt4.js 加载极验组件，传入 NEXT_PUBLIC_GEETEST_CAPTCHA_ID
- * 2. 用户通过验证后，前端拿到 lot_number + captcha_output + pass_token + gen_time
- * 3. 前端将票据四元组随业务请求提交到后端
- * 4. 后端调用本类的 verifyTicket 方法，向极验服务端发起二次校验
- * 5. 极验返回 result: "success" 即通过
- */
 export class Geetest4Provider implements CaptchaProvider {
-  /** Provider 唯一标识（不受生产构建压缩影响） */
   static readonly providerName = 'Geetest4Provider';
   readonly providerName = Geetest4Provider.providerName;
 
   private readonly captchaId: string;
   private readonly captchaKey: string;
-  /** 极验四代服务端校验接口 */
   private readonly verifyUrl = 'https://gcaptcha4.geetest.com/verify';
 
   constructor(captchaId: string, captchaKey: string) {
@@ -53,12 +46,7 @@ export class Geetest4Provider implements CaptchaProvider {
     this.captchaKey = captchaKey;
   }
 
-  /**
-   * 向极验服务端发起票据二次校验
-   * 文档：https://docs.geetest.com/gt4/apirefer/api/server
-   */
-  async verifyTicket(ticket: CaptchaTicket): Promise<boolean> {
-    // 参数完整性校验
+  async verifyTicket(ticket: CaptchaTicket): Promise<VerifyResult> {
     if (
       !ticket.lot_number ||
       !ticket.captcha_output ||
@@ -71,19 +59,18 @@ export class Geetest4Provider implements CaptchaProvider {
         has_token: !!ticket.pass_token,
         has_gen_time: !!ticket.gen_time,
       });
-      return false;
+      return { pass: false, reason: '票据参数不完整' };
     }
 
     console.log('[Geetest4] 开始校验', {
       captchaId: this.captchaId,
       lot_number: ticket.lot_number,
       gen_time: ticket.gen_time,
-      // 只输出长度和前几位，避免泄露完整票据
       output_len: ticket.captcha_output.length,
       token_len: ticket.pass_token.length,
     });
 
-    // 极验四代校验签名：Wgt5d (MD5(lot_number + captcha_output + pass_token + gen_time + captchaKey))
+    // 签名算法：MD5(lot_number + captcha_output + pass_token + gen_time + captchaKey)
     const signStr =
       ticket.lot_number +
       ticket.captcha_output +
@@ -91,11 +78,9 @@ export class Geetest4Provider implements CaptchaProvider {
       ticket.gen_time +
       this.captchaKey;
 
-    // 使用 Node 内置 crypto 模块计算 MD5（避免引入额外依赖）
     const { createHash } = await import('crypto');
     const signToken = createHash('md5').update(signStr).digest('hex');
 
-    // 构造请求参数
     const params = new URLSearchParams({
       lot_number: ticket.lot_number,
       captcha_output: ticket.captcha_output,
@@ -109,7 +94,6 @@ export class Geetest4Provider implements CaptchaProvider {
     console.log('[Geetest4] 请求极验服务端', this.verifyUrl);
 
     try {
-      // 设置 5 秒超时，防止极验服务异常拖垮接口
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
 
@@ -127,57 +111,40 @@ export class Geetest4Provider implements CaptchaProvider {
 
       if (!response.ok) {
         console.error('[Geetest4] HTTP 错误', response.status, response.statusText);
-        return false;
+        return { pass: false, reason: `极验服务端 HTTP ${response.status}` };
       }
 
       const data = (await response.json()) as { result?: string; reason?: string };
       console.log('[Geetest4] 极验返回', data);
 
-      // 极验返回 result: "success" 表示验证通过
       if (data.result === 'success') {
-        return true;
+        return { pass: true };
       }
 
       console.warn('[Geetest4] 校验失败 reason=', data.reason);
-      return false;
+      return { pass: false, reason: data.reason || '极验校验未通过' };
     } catch (error) {
       console.error('[Geetest4] 校验异常', error);
-      return false;
+      return { pass: false, reason: '极验服务端连接异常' };
     }
   }
 }
 
-// ============ Mock 实现（开发/测试环境，未配置极验密钥时使用）============
+// ============ Mock 实现（开发/测试环境）============
 
-/**
- * 开发环境 Mock 验证码 Provider
- * 当未配置极验密钥时自动启用，所有票据默认通过
- * 生产环境必须配置真实密钥，否则视为不安全
- */
 export class MockCaptchaProvider implements CaptchaProvider {
   static readonly providerName = 'MockCaptchaProvider';
   readonly providerName = MockCaptchaProvider.providerName;
 
-  async verifyTicket(_ticket: CaptchaTicket): Promise<boolean> {
-    console.warn('[Captcha] 使用 Mock Provider，跳过验证码校验。请确认生产环境已配置极验密钥。');
-    return true;
+  async verifyTicket(_ticket: CaptchaTicket): Promise<VerifyResult> {
+    console.warn('[Captcha] 使用 Mock Provider，跳过验证码校验。');
+    return { pass: true };
   }
 }
 
 // ============ 工厂函数（业务层入口）============
 
-/**
- * 获取验证码 Provider 实例
- *
- * 自动判断：
- * - 已配置极验密钥 → 使用 Geetest4Provider
- * - 未配置 → 使用 MockCaptchaProvider（开发环境）
- *
- * 切换其他服务商时，仅修改此处即可
- */
 export function getCaptchaProvider(): CaptchaProvider {
-  // 后端优先使用纯服务端变量 GEETEST_CAPTCHA_ID（不暴露给前端，更安全）
-  // 回退到 NEXT_PUBLIC_GEETEST_CAPTCHA_ID（前端共用变量，向后兼容）
   const captchaId =
     process.env.GEETEST_CAPTCHA_ID || process.env.NEXT_PUBLIC_GEETEST_CAPTCHA_ID;
   const captchaKey = process.env.GEETEST_CAPTCHA_KEY;
@@ -201,10 +168,6 @@ export function getCaptchaProvider(): CaptchaProvider {
   return new MockCaptchaProvider();
 }
 
-/**
- * 判断当前是否启用了真实验证码校验
- * 用于前端提示开发者配置密钥
- */
 export function isCaptchaConfigured(): boolean {
   const captchaId =
     process.env.GEETEST_CAPTCHA_ID || process.env.NEXT_PUBLIC_GEETEST_CAPTCHA_ID;
