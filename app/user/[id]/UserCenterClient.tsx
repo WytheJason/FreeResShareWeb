@@ -8,17 +8,17 @@
  * - 帖子/评论/收藏/浏览记录列表
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Edit, Mail, X, Send } from 'lucide-react';
 import type { Post, UserProfile, CaptchaTicket, PageResult } from '@/lib/types';
-import { formatRegisterDuration, formatRelativeTime, isValidCaptchaTicket } from '@/lib/utils';
+import { formatRegisterDuration, formatRelativeTime } from '@/lib/utils';
 import PostCard from '@/components/PostCard';
 import Pagination from '@/components/Pagination';
 import Empty from '@/components/Empty';
 import VipBadge from '@/components/VipBadge';
-import GeetestWidget from '@/components/GeetestWidget';
+import GeetestWidget, { type GeetestWidgetHandle } from '@/components/GeetestWidget';
 import { useToast } from '@/components/Toast';
 
 export type TabKey = 'posts' | 'comments' | 'collects' | 'history';
@@ -63,8 +63,7 @@ export default function UserCenterClient({
   const [editForm, setEditForm] = useState({
     nickname: profile.nickname, avatar: profile.avatar, bio: profile.bio,
   });
-  const [editCaptcha, setEditCaptcha] = useState<CaptchaTicket | null>(null);
-  const [captchaKey, setCaptchaKey] = useState(0);
+  const editGeetestRef = useRef<GeetestWidgetHandle>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   function pushParams(tab: TabKey, page: number) {
@@ -80,12 +79,14 @@ export default function UserCenterClient({
       toast.show('error', '请输入昵称');
       return;
     }
-    if (!isValidCaptchaTicket(editCaptcha)) {
-      toast.show('error', '请先完成人机验证');
-      return;
-    }
     setEditSubmitting(true);
     try {
+      const ticket = await editGeetestRef.current?.verify();
+      if (!ticket) {
+        setEditSubmitting(false);
+        return;
+      }
+
       const res = await fetch('/api/auth/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -93,18 +94,18 @@ export default function UserCenterClient({
           nickname: editForm.nickname,
           avatar: editForm.avatar,
           bio: editForm.bio,
-          captcha: editCaptcha,
+          captcha: ticket,
         }),
       });
       const json = await res.json();
       if (json.code === 0) {
         toast.show('success', '资料已更新');
         setEditOpen(false);
-        setEditCaptcha(null);
-        setCaptchaKey((k) => k + 1);
+        editGeetestRef.current?.reset();
         router.refresh();
       } else {
         toast.show('error', json.message || '更新失败');
+        editGeetestRef.current?.reset();
       }
     } catch {
       toast.show('error', '网络异常');
@@ -298,7 +299,7 @@ export default function UserCenterClient({
                 />
               </div>
               <div>
-                <GeetestWidget key={captchaKey} onVerified={(t) => setEditCaptcha(t)} />
+                <GeetestWidget ref={editGeetestRef} onVerified={() => {}} />
               </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">

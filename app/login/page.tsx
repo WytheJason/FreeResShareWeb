@@ -9,7 +9,7 @@
  * - 登录成功后跳转到 redirect 参数或 '/'
  * - 注册成功后自动切换到登录 tab
  */
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, User, Eye, EyeOff, Sparkles, ArrowLeft } from 'lucide-react';
@@ -18,12 +18,11 @@ import {
   isValidEmail,
   isValidPassword,
   isValidNickname,
-  isValidCaptchaTicket,
 } from '@/lib/utils';
 import type { CaptchaTicket } from '@/lib/types';
 import { useToast } from '@/components/Toast';
 import { Spinner } from '@/components/Loading';
-import GeetestWidget from '@/components/GeetestWidget';
+import GeetestWidget, { type GeetestWidgetHandle } from '@/components/GeetestWidget';
 
 type TabKey = 'login' | 'register';
 
@@ -46,7 +45,7 @@ export default function LoginPage() {
   const [regPwd, setRegPwd] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
   const [regNick, setRegNick] = useState('');
-  const [captcha, setCaptcha] = useState<CaptchaTicket | null>(null);
+  const geetestRef = useRef<GeetestWidgetHandle>(null);
 
   // 读取 redirect 参数 + 检查登录态
   useEffect(() => {
@@ -130,13 +129,14 @@ export default function LoginPage() {
       toast.show('error', '昵称格式不正确（1-20 位中英文数字下划线）');
       return;
     }
-    if (!isValidCaptchaTicket(captcha)) {
-      toast.show('error', '请先完成人机验证');
-      return;
-    }
 
     setLoading(true);
     try {
+      const ticket = await geetestRef.current?.verify();
+      if (!ticket) {
+        return;
+      }
+
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -144,22 +144,22 @@ export default function LoginPage() {
           email: regEmail,
           password: regPwd,
           nickname: regNick.trim() || undefined,
-          captcha,
+          captcha: ticket,
         }),
       });
       const data = await res.json();
       if (data.code === 0) {
         toast.show('success', '注册成功，请登录');
-        // 自动切换到登录 tab，并预填邮箱
         setLoginEmail(regEmail);
         setRegEmail('');
         setRegPwd('');
         setRegConfirm('');
         setRegNick('');
-        setCaptcha(null);
+        geetestRef.current?.reset();
         setTab('login');
       } else {
         toast.show('error', data.message || '注册失败');
+        geetestRef.current?.reset();
       }
     } catch {
       toast.show('error', '网络错误，请稍后重试');
@@ -391,7 +391,8 @@ export default function LoginPage() {
                 人机验证
               </label>
               <GeetestWidget
-                onVerified={(t) => setCaptcha(t)}
+                ref={geetestRef}
+                onVerified={() => {}}
                 onError={(msg) => toast.show('error', msg)}
               />
             </div>

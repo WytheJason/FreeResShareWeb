@@ -9,7 +9,7 @@
  * - 底部极验验证 + 发布按钮
  * - 提交后跳转 /post/[id]
  */
-import { useEffect, useState, type FormEvent, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -21,7 +21,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { getSupabaseBrowser } from '@/lib/supabase';
-import { isValidPanCode, isValidCaptchaTicket } from '@/lib/utils';
+import { isValidPanCode } from '@/lib/utils';
 import type {
   PostCategory,
   PanType,
@@ -32,7 +32,7 @@ import type {
 import { CATEGORY_LABELS, PAN_TYPE_LABELS } from '@/lib/types';
 import { useToast } from '@/components/Toast';
 import { Spinner } from '@/components/Loading';
-import GeetestWidget from '@/components/GeetestWidget';
+import GeetestWidget, { type GeetestWidgetHandle } from '@/components/GeetestWidget';
 
 // 网盘类型对应的合法域名（前端简单校验，后端会再做严格校验）
 const PAN_DOMAINS: Record<PanType, string[]> = {
@@ -68,6 +68,7 @@ export default function PublishPage() {
   const [coverUrl, setCoverUrl] = useState('');
   const [isVip, setIsVip] = useState(false);
   const [captcha, setCaptcha] = useState<CaptchaTicket | null>(null);
+  const geetestRef = useRef<GeetestWidgetHandle>(null);
 
   // 获取当前登录用户（用于封面上传路径与 VIP 提示）
   useEffect(() => {
@@ -173,13 +174,7 @@ export default function PublishPage() {
       return;
     }
 
-    // 2. 极验校验
-    if (!isValidCaptchaTicket(captcha)) {
-      toast.show('error', '请先完成人机验证');
-      return;
-    }
-
-    // 3. 构造表单数据
+    // 2. 构造表单数据
     const form: PostForm = {
       title: safeTitle,
       description: description.trim(),
@@ -193,10 +188,16 @@ export default function PublishPage() {
 
     setLoading(true);
     try {
+      const ticket = await geetestRef.current?.verify();
+      if (!ticket) {
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch('/api/post/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, captcha }),
+        body: JSON.stringify({ ...form, captcha: ticket }),
       });
       const data = await res.json();
       if (data.code === 0 && data.data?.id) {
@@ -204,6 +205,7 @@ export default function PublishPage() {
         router.push(`/post/${data.data.id}`);
       } else {
         toast.show('error', data.message || '发布失败');
+        geetestRef.current?.reset();
       }
     } catch {
       toast.show('error', '网络错误，请稍后重试');
@@ -470,7 +472,8 @@ export default function PublishPage() {
               人机验证 <span className="text-danger">*</span>
             </label>
             <GeetestWidget
-              onVerified={(t) => setCaptcha(t)}
+              ref={geetestRef}
+              onVerified={() => {}}
               onError={(msg) => toast.show('error', msg)}
             />
           </div>

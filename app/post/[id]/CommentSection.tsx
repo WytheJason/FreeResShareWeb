@@ -13,9 +13,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { X, Send } from 'lucide-react';
 import type { Comment, PageResult, CaptchaTicket, UserProfile } from '@/lib/types';
-import { isValidCaptchaTicket } from '@/lib/utils';
 import CommentTree from '@/components/CommentTree';
-import GeetestWidget from '@/components/GeetestWidget';
+import GeetestWidget, { type GeetestWidgetHandle } from '@/components/GeetestWidget';
 import Pagination from '@/components/Pagination';
 import Empty from '@/components/Empty';
 import { useToast } from '@/components/Toast';
@@ -37,8 +36,7 @@ export default function CommentSection({
 
   const [comments, setComments] = useState<PageResult<Comment>>(initialComments);
   const [content, setContent] = useState('');
-  const [captcha, setCaptcha] = useState<CaptchaTicket | null>(null);
-  const [captchaKey, setCaptchaKey] = useState(0);
+  const geetestRef = useRef<GeetestWidgetHandle>(null);
   const [replyInfo, setReplyInfo] = useState<{
     parentId: string;
     replyToId: string;
@@ -72,12 +70,14 @@ export default function CommentSection({
       toast.show('error', '请输入评论内容');
       return;
     }
-    if (!isValidCaptchaTicket(captcha)) {
-      toast.show('error', '请先完成人机验证');
-      return;
-    }
     setSubmitting(true);
     try {
+      const ticket = await geetestRef.current?.verify();
+      if (!ticket) {
+        setSubmitting(false);
+        return;
+      }
+
       const res = await fetch('/api/comment/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,7 +86,7 @@ export default function CommentSection({
           content,
           parent_id: replyInfo?.parentId ?? null,
           reply_to_id: replyInfo?.replyToId ?? null,
-          captcha,
+          captcha: ticket,
         }),
       });
       const json = await res.json();
@@ -94,11 +94,11 @@ export default function CommentSection({
         toast.show('success', '评论成功');
         setContent('');
         setReplyInfo(null);
-        setCaptcha(null);
-        setCaptchaKey((k) => k + 1); // 重置极验组件
+        geetestRef.current?.reset();
         await fetchComments(comments.page);
       } else {
         toast.show('error', json.message || '评论失败');
+        geetestRef.current?.reset();
       }
     } catch {
       toast.show('error', '网络异常');
@@ -165,7 +165,7 @@ export default function CommentSection({
             className="input-field min-h-[80px] resize-y"
           />
           <div className="mt-3 flex items-center justify-between">
-            <GeetestWidget key={captchaKey} onVerified={(t) => setCaptcha(t)} />
+            <GeetestWidget ref={geetestRef} onVerified={() => {}} />
             <button onClick={handleSubmit} disabled={submitting} className="btn-primary">
               <Send size={14} />
               {submitting ? '提交中...' : '发布'}
