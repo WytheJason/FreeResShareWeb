@@ -23,6 +23,14 @@ interface GeetestCaptcha {
 // 极验初始化参数
 interface InitOptions {
   captchaId: string;
+  /**
+   * 极验四代渲染模式：
+   * - bind：自触模式，需业务代码主动调用 captcha.verify() 才弹窗
+   * - float：浮动模式，自动在 appendTo 容器内渲染滑块，用户拖动即可验证
+   * - popup：弹窗模式
+   * - custom：自定义模式
+   * 本项目采用 float，避免业务侧手动触发 verify()，UX 更直接
+   */
   product: 'bind' | 'float' | 'popup' | 'custom';
 }
 
@@ -38,8 +46,8 @@ const GEETEST_SDK_URL = 'https://static.geetest.com/v4/gt4.js';
  * 极验 GeeTest4 无感验证前端组件
  *
  * - 动态加载极验 SDK（gt4.js）
- * - 初始化 captcha 对象（product: 'bind' 无感模式）
- * - 验证成功后通过 onVerified 回调传出票据四元组
+ * - 初始化 captcha 对象（product: 'float' 浮动滑块模式）
+ * - 用户拖动滑块完成验证后，通过 onVerified 回调传出票据四元组
  * - 未配置 captcha_id 时跳过验证（开发态），传空票据
  */
 export default function GeetestWidget({ onVerified, onError }: GeetestWidgetProps) {
@@ -105,9 +113,10 @@ export default function GeetestWidget({ onVerified, onError }: GeetestWidgetProp
           cbRef.current.onError?.('极验 SDK 加载失败');
           return;
         }
-        // 初始化极验四代 - bind 无感模式
+        // 初始化极验四代 - float 浮动滑块模式
+        // SDK 会在 appendTo 容器内自动渲染拖动滑块，用户拖动完成即触发 onSuccess
         window.initGeetest4(
-          { captchaId, product: 'bind' },
+          { captchaId, product: 'float' },
           (captcha) => {
             captcha.onSuccess(() => {
               const result = captcha.getValidate();
@@ -141,12 +150,12 @@ export default function GeetestWidget({ onVerified, onError }: GeetestWidgetProp
 
   return (
     <div>
-      {/* 极验验证容器 - 隐藏 */}
-      <div id="geetest-captcha" className="hidden" />
+      {/* 极验滑块渲染容器 - 必须可见，float 模式下 SDK 会在此渲染拖动滑块 */}
+      <div id="geetest-captcha" className="geetest-captcha-box min-h-[44px]" />
 
-      {/* 验证状态指示 */}
+      {/* 验证状态指示（辅助提示，极验本身也会显示状态）*/}
       <div
-        className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
+        className={`mt-2 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
           verified
             ? 'border-success/30 bg-success/10 text-success'
             : 'border-border-subtle bg-bg-surface text-text-muted'
