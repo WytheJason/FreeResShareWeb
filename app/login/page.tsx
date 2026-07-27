@@ -22,7 +22,10 @@ import {
 import type { CaptchaTicket } from '@/lib/types';
 import { useToast } from '@/components/Toast';
 import { Spinner } from '@/components/Loading';
-import GeetestWidget, { type GeetestWidgetHandle } from '@/components/GeetestWidget';
+import GeetestWidget, {
+  type GeetestWidgetHandle,
+  type CaptchaStatus,
+} from '@/components/GeetestWidget';
 
 type TabKey = 'login' | 'register';
 
@@ -46,6 +49,7 @@ export default function LoginPage() {
   const [regConfirm, setRegConfirm] = useState('');
   const [regNick, setRegNick] = useState('');
   const geetestRef = useRef<GeetestWidgetHandle>(null);
+  const [captchaStatus, setCaptchaStatus] = useState<CaptchaStatus>('idle');
 
   // 读取 redirect 参数 + 检查登录态
   useEffect(() => {
@@ -395,18 +399,24 @@ export default function LoginPage() {
                 ref={geetestRef}
                 onVerified={() => {}}
                 onError={(msg) => toast.show('error', msg)}
+                onStatus={(status) => setCaptchaStatus(status)}
               />
             </div>
 
             <button
               type="submit"
-              disabled={loading}
-              className="btn-primary w-full"
+              disabled={loading || captchaStatus === 'loading'}
+              className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
                   <Spinner />
                   处理中...
+                </>
+              ) : captchaStatus === 'loading' ? (
+                <>
+                  <Spinner />
+                  加载验证组件...
                 </>
               ) : (
                 '注册'
