@@ -54,6 +54,8 @@ const EMPTY_TICKET: CaptchaTicket = {
   gen_time: '',
 };
 
+const VERIFY_TIMEOUT_MS = 15000;
+
 const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
   function GeetestWidget({ onVerified, onError, onStatus }, ref) {
     const captchaId = process.env.NEXT_PUBLIC_GEETEST_CAPTCHA_ID;
@@ -71,8 +73,11 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
     const initResolveRef = useRef<(() => void) | null>(null);
     const initRejectRef = useRef<((err: unknown) => void) | null>(null);
 
+    const verifiedTicketRef = useRef<CaptchaTicket | null>(null);
+
     const pendingVerifyRef = useRef<{
       resolve: (ticket: CaptchaTicket | null) => void;
+      timer: ReturnType<typeof setTimeout>;
     } | null>(null);
 
     if (!initPromiseRef.current) {
@@ -82,15 +87,44 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
       });
     }
 
-    const markFailed = (msg: string) => {
-      setStatus('failed');
-      setStatusMsg(msg);
-      cbRef.current.onError?.(msg);
-    };
-
     const waitInit = (): Promise<void> => {
       if (!captchaId) return Promise.resolve();
       return initPromiseRef.current ?? Promise.reject(new Error('初始化未开始'));
+    };
+
+    const resolvePendingVerify = (ticket: CaptchaTicket | null) => {
+      const pending = pendingVerifyRef.current;
+      if (!pending) return;
+      pendingVerifyRef.current = null;
+      clearTimeout(pending.timer);
+      pending.resolve(ticket);
+    };
+
+    const startVerifyTimeout = () => {
+      const timer = setTimeout(() => {
+        if (pendingVerifyRef.current) {
+          setStatus('idle');
+          setStatusMsg('验证超时');
+          cbRef.current.onError?.('验证超时，请重试');
+          resolvePendingVerify(null);
+        }
+      }, VERIFY_TIMEOUT_MS);
+      return timer;
+    };
+
+    const handleVerified = (ticket: CaptchaTicket) => {
+      verifiedTicketRef.current = ticket;
+      setStatus('verified');
+      setStatusMsg('已验证');
+      cbRef.current.onVerified(ticket);
+      resolvePendingVerify(ticket);
+    };
+
+    const handleVerifyError = (msg: string) => {
+      setStatus('idle');
+      setStatusMsg('验证失败');
+      cbRef.current.onError?.(msg);
+      resolvePendingVerify(null);
     };
 
     useImperativeHandle(ref, () => ({
@@ -108,96 +142,48 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
           return null;
         }
 
-        if (!captchaRef.current) {
+        const captcha = captchaRef.current;
+        if (!captcha) {
           cbRef.current.onError?.('极验未初始化，请稍后重试');
           return null;
         }
 
+        if (verifiedTicketRef.current) {
+          return verifiedTicketRef.current;
+        }
+
+        if (pendingVerifyRef.current) {
+          return new Promise<CaptchaTicket | null>((resolve) => {
+            const prev = pendingVerifyRef.current!;
+            const prevResolve = prev.resolve;
+            const prevTimer = prev.timer;
+            prev.resolve = (ticket) => {
+              prevResolve(ticket);
+              resolve(ticket);
+            };
+            clearTimeout(prevTimer);
+            prev.timer = startVerifyTimeout();
+          });
+        }
+
         return new Promise<CaptchaTicket | null>((resolve) => {
-          pendingVerifyRef.current = { resolve };
-
-          const captcha = captchaRef.current;
-          if (!captcha) {
-            cbRef.current.onError?.('极验未初始化，请稍后重试');
-            resolve(null);
-            pendingVerifyRef.current = null;
-            return;
-          }
-
-          let settled = false;
-          const finish = (result: CaptchaTicket | null) => {
-            if (settled) return;
-            settled = true;
-            resolve(result);
-            pendingVerifyRef.current = null;
-          };
-
-          const timeoutMs = 15000;
-          const timer = setTimeout(() => {
-            if (settled) return;
-            setStatus('idle');
-            setStatusMsg('验证超时');
-            cbRef.current.onError?.('验证超时，请重试');
-            finish(null);
-          }, timeoutMs);
-
-          const handleSuccess = () => {
-            if (settled) return;
-            clearTimeout(timer);
-            const result = captcha.getValidate();
-            if (
-              result &&
-              result.lot_number &&
-              result.captcha_output &&
-              result.pass_token &&
-              result.gen_time
-            ) {
-              setStatus('verified');
-              setStatusMsg('已验证');
-              cbRef.current.onVerified(result);
-              finish(result);
-            } else {
-              setStatus('idle');
-              setStatusMsg('验证失败');
-              cbRef.current.onError?.('票据获取失败，请重试');
-              finish(null);
-            }
-          };
-
-          const handleError = (e: { msg: string; code?: number }) => {
-            if (settled) return;
-            clearTimeout(timer);
-            setStatus('idle');
-            setStatusMsg('验证失败');
-            const msg = e?.msg || '验证失败，请重试';
-            cbRef.current.onError?.(msg);
-            finish(null);
-          };
-
-          const handleClose = () => {
-            if (settled) return;
-            clearTimeout(timer);
-            setStatus('idle');
-            setStatusMsg('验证已取消');
-            cbRef.current.onError?.('验证已取消，请重试');
-            finish(null);
-          };
-
-          captcha.onSuccess(handleSuccess);
-          captcha.onError(handleError);
-          captcha.onClose(handleClose);
+          const timer = startVerifyTimeout();
+          pendingVerifyRef.current = { resolve, timer };
 
           try {
             captcha.verify();
           } catch (err) {
-            clearTimeout(timer);
             console.error('[Geetest] verify() 调用异常', err);
+            clearTimeout(timer);
+            pendingVerifyRef.current = null;
             cbRef.current.onError?.('极验验证启动失败');
-            finish(null);
+            resolve(null);
           }
         });
       },
       reset: () => {
+        verifiedTicketRef.current = null;
+        resolvePendingVerify(null);
         setStatus('idle');
         setStatusMsg('未验证');
         captchaRef.current?.reset?.();
@@ -275,6 +261,32 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
                   captchaRef.current = captcha;
                   captcha.appendTo('.geetest-captcha-box');
 
+                  captcha.onSuccess(() => {
+                    const result = captcha.getValidate();
+                    if (
+                      result &&
+                      result.lot_number &&
+                      result.captcha_output &&
+                      result.pass_token &&
+                      result.gen_time
+                    ) {
+                      handleVerified(result);
+                    } else {
+                      handleVerifyError('票据获取失败，请重试');
+                    }
+                  });
+
+                  captcha.onError((e) => {
+                    const msg = e?.msg || '验证失败，请重试';
+                    handleVerifyError(msg);
+                  });
+
+                  captcha.onClose(() => {
+                    if (pendingVerifyRef.current) {
+                      handleVerifyError('验证已取消，请重试');
+                    }
+                  });
+
                   captcha.onReady?.(() => {
                     setStatus('ready');
                     setStatusMsg('请完成滑动验证');
@@ -288,17 +300,21 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
         })
         .then(() => {
           initResolveRef.current?.();
-          console.log('[Geetest] 极验四代无感验证初始化成功');
+          console.log('[Geetest] 极验四代验证初始化成功 (float 模式)');
         })
         .catch((err: unknown) => {
           const msg = err instanceof Error ? err.message : '极验加载失败';
           initRejectRef.current?.(err);
-          markFailed(msg);
+          setStatus('failed');
+          setStatusMsg(msg);
+          cbRef.current.onError?.(msg);
         });
 
       return () => {
         captchaRef.current?.destroy?.();
         captchaRef.current = null;
+        verifiedTicketRef.current = null;
+        resolvePendingVerify(null);
       };
     }, [captchaId]);
 
