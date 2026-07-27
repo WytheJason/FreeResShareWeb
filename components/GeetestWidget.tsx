@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { ShieldCheck, ShieldAlert } from 'lucide-react';
 import type { CaptchaTicket } from '@/lib/types';
 
@@ -18,6 +18,7 @@ interface GeetestCaptcha {
   onSuccess: (cb: () => void) => void;
   onError: (cb: (e: { msg: string }) => void) => void;
   onClose: (cb: () => void) => void;
+  onReady?: (cb: () => void) => void;
   appendTo: (selector: string) => void;
   getValidate: () => CaptchaTicket | null;
   verify: () => void;
@@ -34,6 +35,7 @@ interface InitOptions {
 declare global {
   interface Window {
     initGeetest4?: (opts: InitOptions, cb: (captcha: GeetestCaptcha) => void) => void;
+    loadGeetest4?: (opts: InitOptions, cb: (captcha: GeetestCaptcha) => void) => void;
   }
 }
 
@@ -50,19 +52,27 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
     const cbRef = useRef({ onVerified, onError });
     cbRef.current = { onVerified, onError };
 
+    const pendingVerifyRef = useRef<{
+      resolve: (ticket: CaptchaTicket | null) => void;
+    } | null>(null);
+
     useImperativeHandle(ref, () => ({
       verify: async () => {
         if (!captchaId) {
           return { lot_number: '', captcha_output: '', pass_token: '', gen_time: '' };
         }
         if (!captchaRef.current) {
-          cbRef.current.onError?.('极验未初始化');
+          cbRef.current.onError?.('极验未初始化，请稍后重试');
           return null;
         }
-        captchaRef.current.verify();
-        return new Promise((resolve) => {
+
+        return new Promise<CaptchaTicket | null>((resolve) => {
+          pendingVerifyRef.current = { resolve };
+
+          const captcha = captchaRef.current;
+
           const handleSuccess = () => {
-            const result = captchaRef.current?.getValidate() ?? null;
+            const result = captcha.getValidate();
             if (
               result &&
               result.lot_number &&
@@ -79,20 +89,35 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
               setStatusMsg('验证失败');
               resolve(null);
             }
+            pendingVerifyRef.current = null;
           };
+
           const handleError = (e: { msg: string }) => {
             setVerified(false);
             setStatusMsg('验证失败');
             cbRef.current.onError?.(e?.msg || '验证失败');
             resolve(null);
+            pendingVerifyRef.current = null;
           };
+
           const handleClose = () => {
             setStatusMsg('未验证');
             resolve(null);
+            pendingVerifyRef.current = null;
           };
-          captchaRef.current?.onSuccess(handleSuccess);
-          captchaRef.current?.onError(handleError);
-          captchaRef.current?.onClose(handleClose);
+
+          captcha.onSuccess(handleSuccess);
+          captcha.onError(handleError);
+          captcha.onClose(handleClose);
+
+          try {
+            captcha.verify();
+          } catch (err) {
+            console.error('[Geetest] verify() 调用异常', err);
+            cbRef.current.onError?.('极验验证启动失败');
+            resolve(null);
+            pendingVerifyRef.current = null;
+          }
         });
       },
       reset: () => {
@@ -156,7 +181,13 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
             (captcha) => {
               captchaRef.current = captcha;
               captcha.appendTo('body');
+
+              captcha.onReady?.(() => {
+                setStatusMsg('验证就绪');
+              });
+
               setStatusMsg('验证就绪');
+              console.log('[Geetest] 极验四代无感验证初始化成功');
             }
           );
         })

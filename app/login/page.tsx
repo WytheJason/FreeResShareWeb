@@ -161,7 +161,8 @@ export default function LoginPage() {
         toast.show('error', data.message || '注册失败');
         geetestRef.current?.reset();
       }
-    } catch {
+    } catch (err) {
+      console.error('[Register] 异常', err);
       toast.show('error', '网络错误，请稍后重试');
     } finally {
       setLoading(false);
