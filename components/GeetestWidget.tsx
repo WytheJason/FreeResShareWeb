@@ -113,6 +113,9 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
     };
 
     const handleVerified = (ticket: CaptchaTicket) => {
+      console.log('[Geetest] handleVerified: lot=', ticket.lot_number?.slice(-6),
+        'pass_token=', !!ticket.pass_token,
+        'pendingVerify=', !!pendingVerifyRef.current);
       verifiedTicketRef.current = ticket;
       setStatus('verified');
       setStatusMsg('已验证');
@@ -121,6 +124,7 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
     };
 
     const handleVerifyError = (msg: string) => {
+      console.error('[Geetest] handleVerifyError:', msg);
       setStatus('idle');
       setStatusMsg('验证失败');
       cbRef.current.onError?.(msg);
@@ -129,30 +133,41 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
 
     useImperativeHandle(ref, () => ({
       verify: async () => {
+        console.log('[Geetest] verify() 被调用, captchaId=', !!captchaId,
+          'verifiedTicket=', !!verifiedTicketRef.current,
+          'pendingVerify=', !!pendingVerifyRef.current);
+
         if (!captchaId) {
+          console.log('[Geetest] 无 captchaId, 跳过验证');
           cbRef.current.onVerified(EMPTY_TICKET);
           return EMPTY_TICKET;
         }
 
         try {
+          console.log('[Geetest] 等待初始化...');
           await waitInit();
+          console.log('[Geetest] 初始化完成');
         } catch (err) {
           const msg = err instanceof Error ? err.message : '极验初始化失败';
+          console.error('[Geetest] 初始化失败:', msg);
           cbRef.current.onError?.(msg);
           return null;
         }
 
         const captcha = captchaRef.current;
         if (!captcha) {
+          console.error('[Geetest] captchaRef 为空');
           cbRef.current.onError?.('极验未初始化，请稍后重试');
           return null;
         }
 
         if (verifiedTicketRef.current) {
+          console.log('[Geetest] 返回已缓存的票据');
           return verifiedTicketRef.current;
         }
 
         if (pendingVerifyRef.current) {
+          console.log('[Geetest] 已有待处理验证, 加入等待队列');
           return new Promise<CaptchaTicket | null>((resolve) => {
             const prev = pendingVerifyRef.current!;
             const prevResolve = prev.resolve;
@@ -166,6 +181,7 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
           });
         }
 
+        console.log('[Geetest] 触发新的 captcha.verify()');
         return new Promise<CaptchaTicket | null>((resolve) => {
           const timer = startVerifyTimeout();
           pendingVerifyRef.current = { resolve, timer };

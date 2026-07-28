@@ -116,6 +116,9 @@ export default function LoginPage() {
   // ============ 注册提交 ============
   async function handleRegister(e: FormEvent) {
     e.preventDefault();
+    console.log('[Register] 表单提交, geetestRef=', !!geetestRef.current,
+      'captchaStatus=', captchaStatus);
+
     if (!isValidEmail(regEmail)) {
       toast.show('error', '邮箱格式不正确');
       return;
@@ -136,11 +139,22 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const ticket = await geetestRef.current?.verify();
+      console.log('[Register] 调用 verify()');
+      const verifyPromise = geetestRef.current?.verify() ?? Promise.resolve(null);
+      const timeoutPromise = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), 30000)
+      );
+      const ticket = await Promise.race([verifyPromise, timeoutPromise]);
+      console.log('[Register] verify() 返回, ticket=', !!ticket,
+        'timeout=', ticket === null && geetestRef.current?.verify !== undefined ? true : false);
+
       if (!ticket) {
+        console.warn('[Register] 无有效票据, 注册中止');
+        toast.show('error', '请先完成人机验证');
         return;
       }
 
+      console.log('[Register] 调用注册 API');
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,6 +166,7 @@ export default function LoginPage() {
         }),
       });
       const data = await res.json();
+      console.log('[Register] API 返回:', data.code);
       if (data.code === 0) {
         toast.show('success', '注册成功，请登录');
         setLoginEmail(regEmail);
@@ -169,6 +184,7 @@ export default function LoginPage() {
       console.error('[Register] 异常', err);
       toast.show('error', '网络错误，请稍后重试');
     } finally {
+      console.log('[Register] finally: setLoading(false)');
       setLoading(false);
     }
   }
