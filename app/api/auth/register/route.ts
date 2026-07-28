@@ -18,6 +18,10 @@ import {
 } from '@/lib/utils';
 import type { CaptchaTicket } from '@/lib/types';
 
+// 强制动态渲染，防止 Vercel 静态化导致 API 阻塞
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -72,6 +76,7 @@ export async function POST(request: Request) {
     });
 
     if (error) {
+      console.warn('[Auth Register] createUser 失败:', error.message);
       // 邮箱已存在等错误
       return NextResponse.json(errorResponse(error.message, 1), {
         status: HTTP_STATUS.BAD_REQUEST,
@@ -80,12 +85,16 @@ export async function POST(request: Request) {
 
     // 若提供了昵称，更新 user_profile（触发器已自动创建 profile）
     if (nickname && data.user) {
-      await admin
+      const { error: profileError } = await admin
         .from('user_profile')
         .update({ nickname })
         .eq('id', data.user.id);
+      if (profileError) {
+        console.warn('[Auth Register] 更新昵称失败:', profileError.message);
+      }
     }
 
+    console.log('[Auth Register] 注册成功:', email);
     return NextResponse.json(successResponse(null, '注册成功'), {
       status: HTTP_STATUS.OK,
     });

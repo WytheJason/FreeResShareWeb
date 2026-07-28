@@ -258,20 +258,24 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
           const initFn = window.initGeetest4;
 
           return new Promise<void>((resolve, reject) => {
+            let settled = false;
+            const safeResolve = () => {
+              if (settled) return;
+              settled = true;
+              console.log('[Geetest] initPromise resolved (captcha 实例已创建)');
+              resolve();
+            };
+            const safeReject = (err: unknown) => {
+              if (settled) return;
+              settled = true;
+              reject(err);
+            };
+
             try {
               initFn(
                 {
                   captchaId,
                   product: 'float',
-                  onReady: () => {
-                    setStatus('ready');
-                    setStatusMsg('请完成滑动验证');
-                    resolve();
-                  },
-                  onError: (e) => {
-                    console.error('[Geetest] 初始化 onError', e);
-                    reject(new Error(e?.msg || '极验初始化失败'));
-                  },
                 },
                 (captcha) => {
                   captchaRef.current = captcha;
@@ -307,10 +311,12 @@ const GeetestWidget = forwardRef<GeetestWidgetHandle, GeetestWidgetProps>(
                     setStatus('ready');
                     setStatusMsg('请完成滑动验证');
                   });
+
+                  safeResolve();
                 }
               );
             } catch (err) {
-              reject(err);
+              safeReject(err);
             }
           });
         })
