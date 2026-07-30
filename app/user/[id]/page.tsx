@@ -20,6 +20,7 @@ import type {
 import UserCenterClient, {
   type TabKey,
   type UserCommentItem,
+  type UserStats,
 } from './UserCenterClient';
 
 const PAGE_SIZE = 12;
@@ -125,6 +126,28 @@ export default async function UserPage({
   }
   const profile = profileData as UserProfile;
 
+  // ---------- 1.5. 统计数据（仅本人可见额外信息）----------
+  const userStats: UserStats = {
+    post_count: profile.post_count,
+    comment_count: profile.comment_count,
+    collect_count: 0,
+    view_count: 0,
+  };
+  if (isOwner) {
+    const [{ count: collectCount }, { count: viewCount }] = await Promise.all([
+      supabase
+        .from('collect')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', params.id),
+      supabase
+        .from('view_history')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', params.id),
+    ]).catch(() => [{ count: 0 }, { count: 0 }]);
+    userStats.collect_count = collectCount ?? 0;
+    userStats.view_count = viewCount ?? 0;
+  }
+
   // ---------- 2. 解析 tab 和 page ----------
   const tab: TabKey = VALID_TABS.includes(searchParams.tab as TabKey)
     ? (searchParams.tab as TabKey)
@@ -215,6 +238,7 @@ export default async function UserPage({
       activeTab={tab}
       showNoPermission={showNoPermission}
       pageData={pageData}
+      userStats={userStats}
     />
   );
 }
