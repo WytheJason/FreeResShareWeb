@@ -41,7 +41,6 @@ declare global {
       remove: (widgetId?: string) => void;
       getResponse: (widgetId?: string) => string | undefined;
     };
-    [key: `__turnstileOnLoad_${string}`]: (() => void) | undefined;
   }
 }
 
@@ -150,7 +149,7 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
           }
 
           // 注册唯一回调
-          window[callbackName] = () => {
+          (window as unknown as Record<string, () => void>)[callbackName] = () => {
             resolve();
           };
 
@@ -254,8 +253,9 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
         widgetIdRef.current = null;
         tokenRef.current = null;
         // 清理全局回调
-        if (window[callbackName]) {
-          delete window[callbackName];
+        const win = window as unknown as Record<string, unknown>;
+        if (win[callbackName]) {
+          delete win[callbackName];
         }
       };
     }, [siteKey]);
