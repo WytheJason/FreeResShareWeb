@@ -73,6 +73,20 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
       return !!key && key.length > 20 && /^0x[0-9A-Za-z_-]+$/.test(key);
     };
 
+    // Turnstile 常见错误码映射
+    const getTurnstileErrorMsg = (code?: string): string => {
+      switch (code) {
+        case '300010':
+          return '域名未授权：请在 Cloudflare Turnstile 控制台添加当前域名';
+        case '600010':
+          return '验证请求无效';
+        case '700010':
+          return 'Site Key 不存在或已失效';
+        default:
+          return code ? `验证失败 (${code})` : '验证失败';
+      }
+    };
+
     useEffect(() => {
       destroyedRef.current = false;
 
@@ -167,7 +181,7 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
               console.error('[Turnstile] 验证错误, code:', code);
               tokenRef.current = null;
               setStatus('failed');
-              const msg = code ? `验证失败 (${code})` : '验证失败';
+              const msg = getTurnstileErrorMsg(code);
               setStatusMsg(msg);
               cbRef.current.onError?.(msg);
             },
