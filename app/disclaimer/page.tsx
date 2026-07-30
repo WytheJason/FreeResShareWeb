@@ -38,7 +38,7 @@ export default function DisclaimerPage() {
           <p>
             本站尊重知识产权，用户发布的内容版权归原作者所有。如果您认为本站上有任何内容侵犯了您的合法权益，请通过侵权举报邮箱联系我们，我们将在核实后及时处理。
           </p>
-          <p>侵权举报邮箱：abuse@freeres.cn</p>
+          <p>侵权举报邮箱：superconductor_nt@qq.com</p>
         </section>
 
         <section className="space-y-2">

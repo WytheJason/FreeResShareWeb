@@ -51,9 +51,20 @@ export default function Footer() {
           <div>
             <h3 className="mb-3 text-base font-semibold text-text-primary">联系方式</h3>
             <ul className="space-y-2 text-xs text-text-dim">
-              <li>邮箱：support@freeres.cn</li>
-              <li>商务合作：bd@freeres.cn</li>
-              <li>侵权举报：abuse@freeres.cn</li>
+              <li>邮箱：superconductor_nt@qq.com</li>
+              <li>商务合作：superconductor_nt@qq.com</li>
+              <li>侵权举报：superconductor_nt@qq.com</li>
+              <li>
+                个人主页：
+                <a
+                  href="https://www.bestbzw.xyz"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary-400 hover:underline"
+                >
+                  www.bestbzw.xyz
+                </a>
+              </li>
             </ul>
           </div>
         </div>

@@ -351,7 +351,7 @@ export default async function VipPage() {
                 </p>
               </div>
               <Link
-                href="mailto:support@freeres.cn"
+                href="mailto:superconductor_nt@qq.com"
                 className="btn-gold"
               >
                 联系管理员
