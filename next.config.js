@@ -22,12 +22,13 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self' https: data: blob:",
-              "script-src 'self' https: 'unsafe-inline' 'unsafe-eval' blob:",
+              // 显式列出 challenges.cloudflare.com，避免 CSP 严格匹配导致脚本被拦截
+              "script-src 'self' https://challenges.cloudflare.com https://*.challenges.cloudflare.com 'unsafe-inline' 'unsafe-eval' blob:",
               "script-src-attr 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' https: data: blob:",
-              // Turnstile 验证请求、前端 API、Supabase 都通过 https 访问
-              "connect-src 'self' https: blob: wss:",
+              // Turnstile siteverify / 前端 API / Supabase
+              "connect-src 'self' https://challenges.cloudflare.com https://*.challenges.cloudflare.com https: blob: wss:",
               // Turnstile 内部 iframe 来源 + 自己站
               "frame-src 'self' https://challenges.cloudflare.com https://*.challenges.cloudflare.com blob:",
               "child-src 'self' https://challenges.cloudflare.com blob:",

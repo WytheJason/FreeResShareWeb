@@ -180,6 +180,7 @@ export default function UserCenterClient({
       }
       const res = await fetch('/api/auth/profile', {
         method: 'PUT',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           nickname: editForm.nickname,
@@ -188,6 +189,15 @@ export default function UserCenterClient({
           captcha: { type: 'turnstile', token },
         }),
       });
+
+      // 401 表示登录态已失效
+      if (res.status === 401) {
+        toast.show('error', '登录状态已失效，请重新登录');
+        editTurnstileRef.current?.reset();
+        router.push('/login');
+        return;
+      }
+
       const json = await res.json();
       if (json.code === 0) {
         toast.show('success', '资料已更新');
@@ -229,12 +239,21 @@ export default function UserCenterClient({
     try {
       const res = await fetch('/api/auth/password', {
         method: 'PUT',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           oldPassword: pwdForm.oldPwd,
           newPassword: pwdForm.newPwd,
         }),
       });
+
+      // 401 表示登录态已失效
+      if (res.status === 401) {
+        toast.show('error', '登录状态已失效，请重新登录');
+        router.push('/login');
+        return;
+      }
+
       const json = await res.json();
       if (json.code === 0) {
         toast.show('success', '密码修改成功');

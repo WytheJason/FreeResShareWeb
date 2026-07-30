@@ -80,6 +80,7 @@ export default function CommentSection({
 
       const res = await fetch('/api/comment/add', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           post_id: postId,
@@ -89,6 +90,15 @@ export default function CommentSection({
           captcha: { type: 'turnstile', token },
         }),
       });
+
+      // 401 表示登录态已失效
+      if (res.status === 401) {
+        toast.show('error', '登录状态已失效，请重新登录');
+        turnstileRef.current?.reset();
+        router.push('/login');
+        return;
+      }
+
       const json = await res.json();
       if (json.code === 0) {
         toast.show('success', '评论成功');
