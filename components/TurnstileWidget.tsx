@@ -34,6 +34,7 @@ declare global {
           cData?: string;
           retry?: 'auto' | 'never';
           'retry-interval'?: number;
+          'refresh-expired'?: 'auto' | 'manual' | 'never';
           tabindex?: number;
         }
       ) => string | undefined;
@@ -185,9 +186,9 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
             sitekey: siteKey,
             theme: 'dark',
             size: 'normal',
-            action: 'register',
             retry: 'auto',
             'retry-interval': 8000,
+            'refresh-expired': 'auto',
             callback: (token: string) => {
               if (destroyedRef.current) return;
               console.log('[Turnstile] 验证成功');
