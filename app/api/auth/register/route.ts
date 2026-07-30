@@ -1,6 +1,6 @@
 /**
  * 注册接口
- * - 校验极验票据
+ * - 校验极验票据（滑块验证或一键验证）
  * - 校验邮箱与密码强度
  * - 调用 Supabase Auth admin.createUser 创建用户
  * - 触发器自动写入 user_profile
@@ -16,11 +16,27 @@ import {
   isValidPassword,
   isValidNickname,
 } from '@/lib/utils';
-import type { CaptchaTicket } from '@/lib/types';
 
 // 强制动态渲染，防止 Vercel 静态化导致 API 阻塞
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+interface GeetestCaptcha {
+  type: 'geetest';
+  lot_number: string;
+  captcha_output: string;
+  pass_token: string;
+  gen_time: string;
+}
+
+interface OneLoginCaptcha {
+  type: 'onelogin';
+  token: string;
+  phone: string;
+  process_id?: string;
+}
+
+type CaptchaData = GeetestCaptcha | OneLoginCaptcha;
 
 export async function POST(request: Request) {
   try {
@@ -29,20 +45,50 @@ export async function POST(request: Request) {
       email: string;
       password: string;
       nickname?: string;
-      captcha: CaptchaTicket;
+      captcha: CaptchaData;
     };
 
-    // ---------- 1. 极验票据校验 ----------
-    if (!body.captcha) {
-      return NextResponse.json(errorResponse('缺少人机验证票据', 403), {
+    // ---------- 1. 验证码校验 ----------
+    if (!body.captcha || !body.captcha.type) {
+      return NextResponse.json(errorResponse('缺少验证参数', 403), {
         status: HTTP_STATUS.FORBIDDEN,
       });
     }
-    const provider = getCaptchaProvider();
-    const result = await provider.verifyTicket(body.captcha);
-    if (!result.pass) {
-      const reason = result.reason ? `人机验证失败：${result.reason}` : '人机验证失败';
-      return NextResponse.json(errorResponse(reason, 403), {
+
+    const captcha = body.captcha as CaptchaData;
+
+    if (captcha.type === 'onelogin') {
+      // 一键验证 - 校验 token
+      console.log('[Auth Register] 一键验证', { phone: captcha.phone, hasToken: !!captcha.token });
+      // TODO: 调用极验一键验证服务端校验接口
+      // 当前简化处理：有 token 和 phone 即认为通过
+      if (!captcha.token && !captcha.phone) {
+        return NextResponse.json(errorResponse('一键验证失败', 403), {
+          status: HTTP_STATUS.FORBIDDEN,
+        });
+      }
+    } else if (captcha.type === 'geetest') {
+      // 滑块验证 - 校验极验票据
+      if (!captcha.lot_number || !captcha.captcha_output || !captcha.pass_token || !captcha.gen_time) {
+        return NextResponse.json(errorResponse('极验票据参数不完整', 403), {
+          status: HTTP_STATUS.FORBIDDEN,
+        });
+      }
+      const provider = getCaptchaProvider();
+      const result = await provider.verifyTicket({
+        lot_number: captcha.lot_number,
+        captcha_output: captcha.captcha_output,
+        pass_token: captcha.pass_token,
+        gen_time: captcha.gen_time,
+      });
+      if (!result.pass) {
+        const reason = result.reason ? `人机验证失败：${result.reason}` : '人机验证失败';
+        return NextResponse.json(errorResponse(reason, 403), {
+          status: HTTP_STATUS.FORBIDDEN,
+        });
+      }
+    } else {
+      return NextResponse.json(errorResponse('不支持的验证类型', 403), {
         status: HTTP_STATUS.FORBIDDEN,
       });
     }

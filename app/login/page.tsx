@@ -4,7 +4,9 @@
  * 登录 / 注册页（客户端组件）
  * - Tab 切换：登录 / 注册（默认登录）
  * - 登录表单：email + password + 显示/隐藏密码
- * - 注册表单：email + password + confirm_password + nickname(可选) + 极验验证
+ * - 注册表单：email + password + confirm_password + nickname(可选) + 验证
+ *   - 优先使用一键验证（需要移动网络）
+ *   - 一键验证失败降级到滑块验证
  * - 已登录用户访问自动跳转首页
  * - 登录成功后跳转到 redirect 参数或 '/'
  * - 注册成功后自动切换到登录 tab
@@ -12,7 +14,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, User, Eye, EyeOff, Sparkles, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Sparkles, ArrowLeft, Smartphone } from 'lucide-react';
 import { getSupabaseBrowser } from '@/lib/supabase';
 import {
   isValidEmail,
@@ -26,12 +28,28 @@ import GeetestWidget, {
   type GeetestWidgetHandle,
   type CaptchaStatus,
 } from '@/components/GeetestWidget';
+import OneLoginWidget, {
+  type OneLoginWidgetHandle,
+  type OneLoginTicket,
+} from '@/components/OneLoginWidget';
 
 type TabKey = 'login' | 'register';
+type VerifyMode = 'onelogin' | 'geetest';
 
 export default function LoginPage() {
   const router = useRouter();
   const toast = useToast();
+
+  // 添加 meta referrer 标签（极验一键验证要求）
+  useEffect(() => {
+    const meta = document.createElement('meta');
+    meta.name = 'referrer';
+    meta.content = 'always';
+    document.head.appendChild(meta);
+    return () => {
+      meta.remove();
+    };
+  }, []);
 
   const [tab, setTab] = useState<TabKey>('login');
   const [loading, setLoading] = useState(false);
@@ -49,7 +67,13 @@ export default function LoginPage() {
   const [regConfirm, setRegConfirm] = useState('');
   const [regNick, setRegNick] = useState('');
   const geetestRef = useRef<GeetestWidgetHandle>(null);
+  const oneloginRef = useRef<OneLoginWidgetHandle>(null);
   const [captchaStatus, setCaptchaStatus] = useState<CaptchaStatus>('idle');
+  const [verifyMode, setVerifyMode] = useState<VerifyMode>('onelogin');
+  const [oneLoginFailed, setOneLoginFailed] = useState(false);
+
+  const oneloginAppId = process.env.NEXT_PUBLIC_ONELOGIN_APP_ID;
+  const geetestCaptchaId = process.env.NEXT_PUBLIC_GEETEST_CAPTCHA_ID;
 
   // 读取 redirect 参数 + 检查登录态
   useEffect(() => {
@@ -116,8 +140,6 @@ export default function LoginPage() {
   // ============ 注册提交 ============
   async function handleRegister(e: FormEvent) {
     e.preventDefault();
-    console.log('[Register] 表单提交, geetestRef=', !!geetestRef.current,
-      'captchaStatus=', captchaStatus);
 
     if (!isValidEmail(regEmail)) {
       toast.show('error', '邮箱格式不正确');
@@ -139,53 +161,73 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      console.log('[Register] 调用 verify()');
-      const verifyPromise = geetestRef.current?.verify() ?? Promise.resolve(null);
-      const timeoutPromise = new Promise<null>((resolve) =>
-        setTimeout(() => resolve(null), 30000)
-      );
-      const ticket = await Promise.race([verifyPromise, timeoutPromise]);
-      console.log('[Register] verify() 返回, ticket=', !!ticket,
-        'timeout=', ticket === null && geetestRef.current?.verify !== undefined ? true : false);
+      // 优先使用一键验证
+      if (verifyMode === 'onelogin' && oneloginRef.current) {
+        console.log('[Register] 尝试一键验证');
+        const oneloginTicket = await oneloginRef.current.verify();
+        if (oneloginTicket) {
+          console.log('[Register] 一键验证成功');
+          await submitRegister({
+            type: 'onelogin',
+            token: oneloginTicket.token,
+            phone: oneloginTicket.phone,
+          });
+          return;
+        }
+        // 一键验证失败，降级到滑块验证
+        console.log('[Register] 一键验证失败，降级到滑块验证');
+        setOneLoginFailed(true);
+        setVerifyMode('geetest');
+      }
 
-      if (!ticket) {
-        console.warn('[Register] 无有效票据, 注册中止');
-        toast.show('error', '请先完成人机验证');
+      // 滑块验证
+      console.log('[Register] 使用滑块验证');
+      const geetestTicket = await geetestRef.current?.verify();
+      if (!geetestTicket) {
+        toast.show('error', '请先完成验证');
         return;
       }
 
-      console.log('[Register] 调用注册 API');
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: regEmail,
-          password: regPwd,
-          nickname: regNick.trim() || undefined,
-          captcha: ticket,
-        }),
+      await submitRegister({
+        type: 'geetest',
+        ...geetestTicket,
       });
-      const data = await res.json();
-      console.log('[Register] API 返回:', data.code);
-      if (data.code === 0) {
-        toast.show('success', '注册成功，请登录');
-        setLoginEmail(regEmail);
-        setRegEmail('');
-        setRegPwd('');
-        setRegConfirm('');
-        setRegNick('');
-        geetestRef.current?.reset();
-        setTab('login');
-      } else {
-        toast.show('error', data.message || '注册失败');
-        geetestRef.current?.reset();
-      }
     } catch (err) {
       console.error('[Register] 异常', err);
       toast.show('error', '网络错误，请稍后重试');
     } finally {
-      console.log('[Register] finally: setLoading(false)');
       setLoading(false);
+    }
+  }
+
+  async function submitRegister(captcha: { type: 'onelogin' | 'geetest'; [key: string]: unknown }) {
+    console.log('[Register] 提交注册 API', captcha.type);
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: regEmail,
+        password: regPwd,
+        nickname: regNick.trim() || undefined,
+        captcha,
+      }),
+    });
+    const data = await res.json();
+    console.log('[Register] API 返回:', data.code, data.message);
+
+    if (data.code === 0) {
+      toast.show('success', '注册成功，请登录');
+      setLoginEmail(regEmail);
+      setRegEmail('');
+      setRegPwd('');
+      setRegConfirm('');
+      setRegNick('');
+      geetestRef.current?.reset();
+      oneloginRef.current?.destroy();
+      setTab('login');
+    } else {
+      toast.show('error', data.message || '注册失败');
+      geetestRef.current?.reset();
     }
   }
 
@@ -406,22 +448,58 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* 极验验证 */}
+            {/* 验证组件 */}
             <div>
-              <label className="mb-1 block text-xs text-text-muted">
-                人机验证
-              </label>
-              <GeetestWidget
-                ref={geetestRef}
-                onVerified={() => {}}
-                onError={(msg) => toast.show('error', msg)}
-                onStatus={(status) => setCaptchaStatus(status)}
-              />
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-xs text-text-muted">
+                  {verifyMode === 'onelogin' ? '一键验证' : '人机验证'}
+                </label>
+                {oneLoginFailed && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (verifyMode === 'geetest') {
+                        setVerifyMode('onelogin');
+                      } else {
+                        setVerifyMode('geetest');
+                      }
+                    }}
+                    className="text-xs text-primary-400 hover:text-primary-300"
+                  >
+                    {verifyMode === 'geetest' ? '切换一键验证' : '切换滑块验证'}
+                  </button>
+                )}
+              </div>
+              {verifyMode === 'onelogin' && oneloginAppId ? (
+                <OneLoginWidget
+                  ref={oneloginRef}
+                  appId={oneloginAppId}
+                  onSuccess={(ticket) => {
+                    console.log('[OneLogin] 成功', ticket);
+                  }}
+                  onFail={(error) => {
+                    console.error('[OneLogin] 失败', error);
+                    setOneLoginFailed(true);
+                    setVerifyMode('geetest');
+                    toast.show('error', '一键验证失败，已切换到滑块验证');
+                  }}
+                  onStatus={(status) => {
+                    console.log('[OneLogin] 状态', status);
+                  }}
+                />
+              ) : (
+                <GeetestWidget
+                  ref={geetestRef}
+                  onVerified={() => {}}
+                  onError={(msg) => toast.show('error', msg)}
+                  onStatus={(status) => setCaptchaStatus(status)}
+                />
+              )}
             </div>
 
             <button
               type="submit"
-              disabled={loading || captchaStatus === 'loading'}
+              disabled={loading || (verifyMode === 'geetest' && captchaStatus === 'loading')}
               className="btn-primary w-full disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
@@ -429,7 +507,7 @@ export default function LoginPage() {
                   <Spinner />
                   处理中...
                 </>
-              ) : captchaStatus === 'loading' ? (
+              ) : verifyMode === 'geetest' && captchaStatus === 'loading' ? (
                 <>
                   <Spinner />
                   加载验证组件...
