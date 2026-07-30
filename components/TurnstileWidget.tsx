@@ -74,16 +74,37 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
     };
 
     // Turnstile 常见错误码映射
+    // 官方文档：https://developers.cloudflare.com/turnstile/troubleshooting/client-side-errors/error-codes/
     const getTurnstileErrorMsg = (code?: string): string => {
+      if (!code) return '验证失败';
+      // 300 系列：通用验证失败（可能是机器人行为或网络问题）
+      if (code.startsWith('300')) {
+        return '验证失败：可能是代理/VPN被识别，请尝试切换网络或使用无痕模式';
+      }
+      // 600 系列：通用验证失败
+      if (code.startsWith('600')) {
+        return '验证失败：Cloudflare 风控拦截，请稍后重试';
+      }
       switch (code) {
-        case '300010':
+        case '110100':
+        case '400020':
+          return 'siteKey 无效：请检查环境变量配置';
+        case '110110':
+          return 'siteKey 不存在：请检查 Cloudflare 控制台';
+        case '110200':
           return '域名未授权：请在 Cloudflare Turnstile 控制台添加当前域名';
-        case '600010':
-          return '验证请求无效';
-        case '700010':
-          return 'Site Key 不存在或已失效';
+        case '110600':
+          return '验证超时：本机时钟异常或验证耗时过长';
+        case '110620':
+          return '交互超时：未在规定时间内完成验证';
+        case '200100':
+          return '时钟或缓存异常';
+        case '200500':
+          return 'iframe 加载失败：challenges.cloudflare.com 被拦截';
+        case '400070':
+          return 'siteKey 已被禁用';
         default:
-          return code ? `验证失败 (${code})` : '验证失败';
+          return `验证失败 (${code})`;
       }
     };
 
