@@ -1,13 +1,13 @@
 /**
  * 发布帖子接口
- * - 极验校验 + 防抖锁
+ * - Turnstile 校验 + 防抖锁
  * - 校验标题/简介/分类/网盘链接/提取码
  * - 入库 posts 表
  */
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase-server';
 import { getCurrentUser, canPublish } from '@/lib/auth';
-import { getCaptchaProvider } from '@/lib/geetest4';
+import { verifyTurnstileToken, getTurnstileSecretKey } from '@/lib/turnstile';
 import {
   sanitizeUserContent,
   isValidPanUrl,
@@ -56,19 +56,20 @@ export async function POST(request: Request) {
       });
     }
 
-    // ---------- 2. 极验票据校验 ----------
-    if (!captcha) {
+    // ---------- 2. Turnstile 验证 ----------
+    if (!captcha || !captcha.token) {
       return NextResponse.json(errorResponse('缺少人机验证票据', 403), {
         status: HTTP_STATUS.FORBIDDEN,
       });
     }
-    const provider = getCaptchaProvider();
-    const result = await provider.verifyTicket(captcha);
-    if (!result.pass) {
-      const reason = result.reason ? `人机验证失败：${result.reason}` : '人机验证失败';
-      return NextResponse.json(errorResponse(reason, 403), {
-        status: HTTP_STATUS.FORBIDDEN,
-      });
+    const secretKey = getTurnstileSecretKey();
+    if (secretKey) {
+      const verifyResult = await verifyTurnstileToken(captcha.token, secretKey);
+      if (!verifyResult.success) {
+        return NextResponse.json(errorResponse(`人机验证失败: ${verifyResult.error || '未知错误'}`, 403), {
+          status: HTTP_STATUS.FORBIDDEN,
+        });
+      }
     }
 
     // ---------- 3. 防抖锁（5 秒）----------

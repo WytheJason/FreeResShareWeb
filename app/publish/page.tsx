@@ -26,13 +26,12 @@ import type {
   PostCategory,
   PanType,
   PostForm,
-  CaptchaTicket,
   UserProfile,
 } from '@/lib/types';
 import { CATEGORY_LABELS, PAN_TYPE_LABELS } from '@/lib/types';
 import { useToast } from '@/components/Toast';
 import { Spinner } from '@/components/Loading';
-import GeetestWidget, { type GeetestWidgetHandle } from '@/components/GeetestWidget';
+import TurnstileWidget, { type TurnstileWidgetHandle } from '@/components/TurnstileWidget';
 
 // 网盘类型对应的合法域名（前端简单校验，后端会再做严格校验）
 const PAN_DOMAINS: Record<PanType, string[]> = {
@@ -67,8 +66,7 @@ export default function PublishPage() {
   const [panCode, setPanCode] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
   const [isVip, setIsVip] = useState(false);
-  const [captcha, setCaptcha] = useState<CaptchaTicket | null>(null);
-  const geetestRef = useRef<GeetestWidgetHandle>(null);
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
 
   // 获取当前登录用户（用于封面上传路径与 VIP 提示）
   useEffect(() => {
@@ -188,8 +186,8 @@ export default function PublishPage() {
 
     setLoading(true);
     try {
-      const ticket = await geetestRef.current?.verify();
-      if (!ticket) {
+      const token = await turnstileRef.current?.getToken();
+      if (!token) {
         setLoading(false);
         return;
       }
@@ -197,7 +195,7 @@ export default function PublishPage() {
       const res = await fetch('/api/post/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, captcha: ticket }),
+        body: JSON.stringify({ ...form, captcha: { type: 'turnstile', token } }),
       });
       const data = await res.json();
       if (data.code === 0 && data.data?.id) {
@@ -205,7 +203,7 @@ export default function PublishPage() {
         router.push(`/post/${data.data.id}`);
       } else {
         toast.show('error', data.message || '发布失败');
-        geetestRef.current?.reset();
+        turnstileRef.current?.reset();
       }
     } catch {
       toast.show('error', '网络错误，请稍后重试');
@@ -471,9 +469,10 @@ export default function PublishPage() {
             <label className="mb-1 block text-xs text-text-muted">
               人机验证 <span className="text-danger">*</span>
             </label>
-            <GeetestWidget
-              ref={geetestRef}
-              onVerified={() => {}}
+            <TurnstileWidget
+              ref={turnstileRef}
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+              onSuccess={() => {}}
               onError={(msg) => toast.show('error', msg)}
             />
           </div>

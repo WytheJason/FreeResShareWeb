@@ -150,12 +150,10 @@ export interface AdminStats {
   pending_reports: number;
 }
 
-// ============ 极验票据参数 ============
+// ============ Turnstile 验证参数 ============
 export interface CaptchaTicket {
-  lot_number: string;
-  captcha_output: string;
-  pass_token: string;
-  gen_time: string;
+  type: 'turnstile';
+  token: string;
 }
 
 // ============ 分页参数 ============

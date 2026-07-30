@@ -12,13 +12,13 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Edit, Mail, X, Send } from 'lucide-react';
-import type { Post, UserProfile, CaptchaTicket, PageResult } from '@/lib/types';
+import type { Post, UserProfile, PageResult } from '@/lib/types';
 import { formatRegisterDuration, formatRelativeTime } from '@/lib/utils';
 import PostCard from '@/components/PostCard';
 import Pagination from '@/components/Pagination';
 import Empty from '@/components/Empty';
 import VipBadge from '@/components/VipBadge';
-import GeetestWidget, { type GeetestWidgetHandle } from '@/components/GeetestWidget';
+import TurnstileWidget, { type TurnstileWidgetHandle } from '@/components/TurnstileWidget';
 import { useToast } from '@/components/Toast';
 
 export type TabKey = 'posts' | 'comments' | 'collects' | 'history';
@@ -63,7 +63,7 @@ export default function UserCenterClient({
   const [editForm, setEditForm] = useState({
     nickname: profile.nickname, avatar: profile.avatar, bio: profile.bio,
   });
-  const editGeetestRef = useRef<GeetestWidgetHandle>(null);
+  const editTurnstileRef = useRef<TurnstileWidgetHandle>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   function pushParams(tab: TabKey, page: number) {
@@ -81,8 +81,8 @@ export default function UserCenterClient({
     }
     setEditSubmitting(true);
     try {
-      const ticket = await editGeetestRef.current?.verify();
-      if (!ticket) {
+      const token = await editTurnstileRef.current?.getToken();
+      if (!token) {
         setEditSubmitting(false);
         return;
       }
@@ -94,18 +94,18 @@ export default function UserCenterClient({
           nickname: editForm.nickname,
           avatar: editForm.avatar,
           bio: editForm.bio,
-          captcha: ticket,
+          captcha: { type: 'turnstile', token },
         }),
       });
       const json = await res.json();
       if (json.code === 0) {
         toast.show('success', '资料已更新');
         setEditOpen(false);
-        editGeetestRef.current?.reset();
+        editTurnstileRef.current?.reset();
         router.refresh();
       } else {
         toast.show('error', json.message || '更新失败');
-        editGeetestRef.current?.reset();
+        editTurnstileRef.current?.reset();
       }
     } catch {
       toast.show('error', '网络异常');
@@ -299,7 +299,11 @@ export default function UserCenterClient({
                 />
               </div>
               <div>
-                <GeetestWidget ref={editGeetestRef} onVerified={() => {}} />
+                <TurnstileWidget
+                  ref={editTurnstileRef}
+                  siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                  onSuccess={() => {}}
+                />
               </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">

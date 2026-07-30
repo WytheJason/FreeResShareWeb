@@ -12,9 +12,9 @@ import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { X, Send } from 'lucide-react';
-import type { Comment, PageResult, CaptchaTicket, UserProfile } from '@/lib/types';
+import type { Comment, PageResult, UserProfile } from '@/lib/types';
 import CommentTree from '@/components/CommentTree';
-import GeetestWidget, { type GeetestWidgetHandle } from '@/components/GeetestWidget';
+import TurnstileWidget, { type TurnstileWidgetHandle } from '@/components/TurnstileWidget';
 import Pagination from '@/components/Pagination';
 import Empty from '@/components/Empty';
 import { useToast } from '@/components/Toast';
@@ -36,7 +36,7 @@ export default function CommentSection({
 
   const [comments, setComments] = useState<PageResult<Comment>>(initialComments);
   const [content, setContent] = useState('');
-  const geetestRef = useRef<GeetestWidgetHandle>(null);
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
   const [replyInfo, setReplyInfo] = useState<{
     parentId: string;
     replyToId: string;
@@ -72,8 +72,8 @@ export default function CommentSection({
     }
     setSubmitting(true);
     try {
-      const ticket = await geetestRef.current?.verify();
-      if (!ticket) {
+      const token = await turnstileRef.current?.getToken();
+      if (!token) {
         setSubmitting(false);
         return;
       }
@@ -86,7 +86,7 @@ export default function CommentSection({
           content,
           parent_id: replyInfo?.parentId ?? null,
           reply_to_id: replyInfo?.replyToId ?? null,
-          captcha: ticket,
+          captcha: { type: 'turnstile', token },
         }),
       });
       const json = await res.json();
@@ -94,11 +94,11 @@ export default function CommentSection({
         toast.show('success', '评论成功');
         setContent('');
         setReplyInfo(null);
-        geetestRef.current?.reset();
+        turnstileRef.current?.reset();
         await fetchComments(comments.page);
       } else {
         toast.show('error', json.message || '评论失败');
-        geetestRef.current?.reset();
+        turnstileRef.current?.reset();
       }
     } catch {
       toast.show('error', '网络异常');
@@ -165,7 +165,11 @@ export default function CommentSection({
             className="input-field min-h-[80px] resize-y"
           />
           <div className="mt-3 flex items-center justify-between">
-            <GeetestWidget ref={geetestRef} onVerified={() => {}} />
+            <TurnstileWidget
+              ref={turnstileRef}
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+              onSuccess={() => {}}
+            />
             <button onClick={handleSubmit} disabled={submitting} className="btn-primary">
               <Send size={14} />
               {submitting ? '提交中...' : '发布'}
