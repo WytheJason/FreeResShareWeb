@@ -1,156 +1,121 @@
 /**
- * 全局中间件
- * - 路由鉴权：拦截未登录用户访问受保护页面
- * - IP 限流：保护 API 接口免受 CC 攻击
- * - Vercel Edge Runtime 适配
+ * Next.js Middleware
+ * 功能：
+ *  1. 轻量 IP 限流（基于 geo 的临时 IP，用 x-real-ip/x-forwarded-for 兜底）
+ *  2. 请求日志（仅打印，避免写库阻塞）
+ *  3. 统一安全头（X-Content-Type-Options/Referrer-Policy），专门兼容 Cloudflare Turnstile iframe
+ *
+ *  注意：
+ *  - matcher 已排除 /_next 静态资源、/public 资源、/cdn-cgi/*（Turnstile 验证平台内部路径）
+ *  - 不对响应做复杂改写，保证 Edge Runtime 轻量可用
  */
+import { NextRequest, NextResponse } from 'next/server';
 
-import { NextResponse, type NextRequest } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { checkRateLimit, getClientIp, cleanupRateLimitStore } from '@/lib/rate-limit';
+const LOG_ENABLED = false;
 
-/** cookiesToSet 参数类型 */
-interface CookieEntry {
-  name: string;
-  value: string;
-  options: CookieOptions;
+// ---------- 配置：轻量限流 ----------
+// 计数器仅进程内有效（重启重置），仅用于节流防简单刷；Edge Runtime 下无 Map 共享
+const rateLimit = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW = 60_000; // 1 分钟
+const RATE_LIMIT_MAX = 45; // 每分钟 45 次
+
+// ---------- 配置：用户操作更强的限流（仅对 /api/auth/* /api/post/* /api/comment/*）----------
+const AUTH_WRITE_LIMIT_MAX = 10;
+
+// 提取"最可信"的客户端 IP
+function extractIp(req: NextRequest): string {
+  return (
+    req.headers.get('x-real-ip') ||
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    // 兜底
+    (req as unknown as { ip?: string }).ip ||
+    (req as unknown as { geo?: { ip?: string } }).geo?.ip ||
+    '0.0.0.0'
+  );
 }
 
-// ============ 路由权限配置 ============
+export function middleware(req: NextRequest) {
+  const url = req.nextUrl;
 
-/** 需要登录才能访问的页面路径前缀 */
-const PROTECTED_PATHS = ['/publish', '/user/', '/admin'];
+  // ---- 0. 预先放行静态路径（与 matcher 语义保持一致，避免意外）----
+  if (
+    url.pathname.startsWith('/_next/') ||
+    url.pathname.startsWith('/icon.svg') ||
+    url.pathname.startsWith('/images/') ||
+    url.pathname.startsWith('/favicon.') ||
+    url.pathname.startsWith('/cdn-cgi/') || // Turnstile 验证平台内部请求
+    url.pathname.startsWith('/robots.txt') ||
+    url.pathname.startsWith('/sitemap.xml')
+  ) {
+    return NextResponse.next();
+  }
 
-/** 仅管理员可访问的页面路径前缀 */
-const ADMIN_PATHS = ['/admin'];
+  // ---- 1. IP 限流 ----
+  const ip = extractIp(req);
+  const now = Date.now();
+  const prev = rateLimit.get(ip);
+  let bucket = prev;
+  if (!bucket || bucket.resetAt < now) {
+    bucket = { count: 0, resetAt: now + RATE_LIMIT_WINDOW };
+    rateLimit.set(ip, bucket);
+  }
+  bucket.count += 1;
 
-/** 需要限流的 API 路径前缀 */
-const RATE_LIMITED_API = ['/api/'];
+  // 仅对写操作相关 API 做更强限流；读接口按普通限制
+  const isAuthOrWrite =
+    url.pathname.startsWith('/api/auth/') ||
+    url.pathname.startsWith('/api/post/') ||
+    url.pathname.startsWith('/api/comment/') ||
+    url.pathname.startsWith('/api/announcement/');
+  const limit = isAuthOrWrite ? AUTH_WRITE_LIMIT_MAX : RATE_LIMIT_MAX;
 
-/** 写操作 API 路径（更严格限流） */
-const WRITE_API_PATTERNS = [
-  '/api/auth/register',
-  '/api/auth/login',
-  '/api/post/create',
-  '/api/comment/add',
-  '/api/report/submit',
-];
-
-// ============ 中间件主入口 ============
-
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  // ---------- 1. API 限流 ----------
-  if (pathname.startsWith('/api/')) {
-    const ip = getClientIp(request);
-    cleanupRateLimitStore();
-
-    // 写操作接口：更严格限流（30 次/分钟）
-    const isWriteApi = WRITE_API_PATTERNS.some((p) => pathname === p);
-    const result = checkRateLimit(ip, pathname, {
-      windowMs: 60 * 1000,
-      maxRequests: isWriteApi ? 30 : 60,
-    });
-
-    if (!result.allowed) {
-      return NextResponse.json(
-        {
-          code: 429,
-          message: `请求过于频繁，请 ${Math.ceil(result.resetInMs / 1000)} 秒后重试`,
-        },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': String(Math.ceil(result.resetInMs / 1000)),
-            'X-RateLimit-Limit': String(result.limit),
-            'X-RateLimit-Remaining': '0',
-          },
-        }
+  if (bucket.count > limit) {
+    const res = new NextResponse(
+      JSON.stringify({ code: 429, message: '请求过于频繁，请稍后再试' }),
+      {
+        status: 429,
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      }
+    );
+    if (LOG_ENABLED) {
+      console.warn(
+        `[rate-limit] blocked ip=${ip} path=${url.pathname} count=${bucket.count}`
       );
     }
+    return res;
   }
 
-  // ---------- 2. 页面鉴权 ----------
-  const isProtected = PROTECTED_PATHS.some((p) => pathname.startsWith(p));
-  if (!isProtected) {
-    return NextResponse.next();
+  // ---- 2. 正常放行 + 统一安全响应头 ----
+  const res = NextResponse.next();
+
+  // 基础安全头（保持简洁，不设置严格 CSP，避免破坏 Turnstile iframe postMessage）
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+
+  // Referrer-Policy：使用 no-referrer-when-downgrade，Turnstile iframe 跨域通信依赖正确的 referrer
+  // 之前的 strict-origin-when-cross-origin 会导致 Turnstile iframe 拿不到完整 referrer，触发 postMessage origin 校验失败
+  res.headers.set('Referrer-Policy', 'no-referrer-when-downgrade');
+
+  // 明确允许 Turnstile iframe 嵌入，frame-ancestors 放宽；X-Frame-Options 由 Next.js / 浏览器默认处理
+  // 这里不设置 X-Frame-Options，否则会和 Turnstile 多层 iframe 冲突
+  // Content-Security-Policy 的 frame-src 等也不在 Edge 层统一设置，改由 next.config.js headers 处理
+
+  // Permissions-Policy：关闭敏感特性
+  res.headers.set(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), interest-cohort=()'
+  );
+
+  if (LOG_ENABLED) {
+    console.log(
+      `[req] ${req.method} ${url.pathname}?${url.searchParams.toString().slice(0, 80)} ip=${ip} count=${bucket.count}`
+    );
   }
-
-  // 创建 Supabase 服务端客户端读取会话
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    // 未配置 Supabase，放行（开发态）
-    return NextResponse.next();
-  }
-
-  const response = NextResponse.next();
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet: CookieEntry[]) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options);
-        });
-      },
-    },
-  });
-
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    // 未登录用户访问受保护页面 → 跳转登录页
-    if (!user) {
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    // 查询用户 profile 检查封禁与管理员权限
-    const { data: profile } = await supabase
-      .from('user_profile')
-      .select('is_admin, is_banned')
-      .eq('id', user.id)
-      .single();
-
-    // 封禁用户拦截
-    if (profile?.is_banned) {
-      const unauthorizedUrl = new URL('/unauthorized', request.url);
-      unauthorizedUrl.searchParams.set('reason', 'banned');
-      return NextResponse.redirect(unauthorizedUrl);
-    }
-
-    // 管理员路由权限校验
-    const isAdminRoute = ADMIN_PATHS.some((p) => pathname.startsWith(p));
-    if (isAdminRoute && !profile?.is_admin) {
-      const unauthorizedUrl = new URL('/unauthorized', request.url);
-      unauthorizedUrl.searchParams.set('reason', 'no-permission');
-      return NextResponse.redirect(unauthorizedUrl);
-    }
-
-    return response;
-  } catch (error) {
-    console.error('[Middleware] 鉴权异常', error);
-    // 鉴权异常时放行，由页面/接口二次校验兜底
-    return response;
-  }
+  return res;
 }
 
-// ============ 匹配规则 ============
-
 export const config = {
+  // /cdn-cgi/* 必须排除，Turnstile 的验证平台脚本和挑战资源都走这条路径
   matcher: [
-    /*
-     * 匹配所有路径，排除：
-     * - _next/static、_next/image、favicon.ico
-     * - public 静态资源
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)',
+    '/((?!_next/static|_next/image|icon.svg|favicon.ico|robots.txt|sitemap.xml|images|cdn-cgi).*)',
   ],
 };

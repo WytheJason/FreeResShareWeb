@@ -15,7 +15,7 @@ export default function DisclaimerPage() {
         <section className="space-y-2">
           <h2 className="text-xl font-semibold text-text-primary">一、资源性质</h2>
           <p>
-            软件/影视网盘资源分享论坛（以下简称"本站"）是一个面向技术爱好者与影视爱好者的网盘资源分享社区。本站所有资源均由用户自行上传分享，本站仅提供信息存储空间服务，不对资源的合法性、完整性、安全性作任何保证。
+            软件/影视网盘资源分享论坛（以下简称&ldquo;本站&rdquo;）是一个面向技术爱好者与影视爱好者的网盘资源分享社区。本站所有资源均由用户自行上传分享，本站仅提供信息存储空间服务，不对资源的合法性、完整性、安全性作任何保证。
           </p>
         </section>
 
