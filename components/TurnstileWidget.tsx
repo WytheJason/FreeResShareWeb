@@ -186,6 +186,7 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
     });
     const tokenRef = useRef<string | null>(null);
     const statusRef = useRef<TurnstileStatus>('idle');
+    const isExecutingRef = useRef(false);  // 防止 execute() 重复调用
 
     // 与父组件同步状态引用，用于 getToken 轮询
     useEffect(() => {
@@ -300,10 +301,11 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
           'retry-interval': 8000,
           'refresh-expired': 'auto',
           appearance: 'always',
-          language: 'zh-CN',
+          language: 'zh-cn',
           callback: (token) => {
             tokenRef.current = token;
             stateRef.current.failRetryCount = 0;
+            isExecutingRef.current = false;
             changeStatus('success', '验证通过');
             try { onSuccess?.(token); } catch { /* 忽略 */ }
           },
@@ -329,6 +331,7 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
             const retryAble = RETRYABLE_ERR.has(code) || code.startsWith('300') || code.startsWith('1000');
             if (retryAble && stateRef.current.failRetryCount < MAX_VERIFY_FAIL_RETRY) {
               stateRef.current.failRetryCount += 1;
+              isExecutingRef.current = false;  // 重置执行标志，允许重试
               changeStatus('loading', `验证重试(${stateRef.current.failRetryCount}/${MAX_VERIFY_FAIL_RETRY})...`);
               // 重置当前 widget
               try {
@@ -336,13 +339,17 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
               } catch { /* 忽略 */ }
               setTimeout(() => {
                 // 主动触发 execute，避免一直停在 idle
-                try { t.execute(stateRef.current.widgetId); } catch { /* 忽略 */ }
+                if (!isExecutingRef.current) {
+                  isExecutingRef.current = true;
+                  try { t.execute(stateRef.current.widgetId); } catch { /* 忽略 */ }
+                }
               }, 400);
               return;
             }
 
             // 最终失败
             tokenRef.current = null;
+            isExecutingRef.current = false;
             changeStatus('failed', msg);
           },
           'expired-callback': () => {
@@ -362,9 +369,12 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
           },
         });
         stateRef.current.widgetId = id;
-        // 让非交互模式也能开始自动验证（Turnstile Widget 在 render 后会触发 execute，这里兜底 execute）
+        // 让 managed 模式自动触发验证；显式 execute 加守卫避免重复
         setTimeout(() => {
-          try { t.execute(id); } catch { /* 允许失败，正常 managed 模式会自动触发 */ }
+          if (!isExecutingRef.current) {
+            isExecutingRef.current = true;
+            try { t.execute(id); } catch { /* 允许失败，正常 managed 模式会自动触发 */ }
+          }
         }, 80);
       } catch (e) {
         console.error('[Turnstile] render 异常', e);
@@ -419,13 +429,16 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
 
         const t0 = Date.now();
         // 立即触发一次 execute（在尚未验证时强制开始验证）
-        try {
-          const t = getTurnstile();
-          if (t && stateRef.current.widgetId && statusRef.current !== 'verifying') {
-            t.execute(stateRef.current.widgetId);
-            changeStatus('verifying', '正在验证...');
-          }
-        } catch { /* 忽略 */ }
+        if (!isExecutingRef.current) {
+          try {
+            const t = getTurnstile();
+            if (t && stateRef.current.widgetId && statusRef.current !== 'verifying' && statusRef.current !== 'success') {
+              isExecutingRef.current = true;
+              t.execute(stateRef.current.widgetId);
+              changeStatus('verifying', '正在验证...');
+            }
+          } catch { /* 忽略 */ }
+        }
 
         const check = () => {
           if (tokenRef.current) return resolve(tokenRef.current);
@@ -444,11 +457,17 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
       reset: () => {
         tokenRef.current = null;
         stateRef.current.failRetryCount = 0;
+        isExecutingRef.current = false;
         try {
           const t = getTurnstile();
           if (t && stateRef.current.widgetId) {
             t.reset(stateRef.current.widgetId);
-            setTimeout(() => t.execute?.(stateRef.current.widgetId!), 150);
+            setTimeout(() => {
+              if (!isExecutingRef.current) {
+                isExecutingRef.current = true;
+                t.execute?.(stateRef.current.widgetId!);
+              }
+            }, 150);
           }
         } catch { /* 忽略 */ }
         changeStatus('idle', '请完成验证');

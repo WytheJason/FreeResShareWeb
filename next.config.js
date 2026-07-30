@@ -1,8 +1,10 @@
 /**
  * Next.js 配置
  * - React strict mode 关闭（避免开发期 useEffect 执行两次导致验证码重复加载）
- * - 允许 Cloudflare Turnstile 的 script-src / connect-src / frame-src / worker-src
- * - 移除 X-Frame-Options（Turnstile 多层 iframe 通信需要）
+ * - CSP 显式放行 Cloudflare Turnstile 所需的所有资源
+ * - 绝对不设置 Cross-Origin-Embedder-Policy / Cross-Origin-Opener-Policy
+ *   这两个头会破坏 Turnstile iframe 与父窗口的 postMessage 通道，
+ *   导致 "Failed to execute 'postMessage' on 'DOMWindow': target origin mismatch"
  */
 
 /** @type {import('next').NextConfig} */
@@ -12,15 +14,14 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // 所有路径统一应用 CSP 和安全头，兼容 Turnstile 验证
         source: '/(.*)',
         headers: [
           {
             // CSP：显式放行 challenges.cloudflare.com
-            // 注意：不设置 default-src 'self' 太严格的限制，否则 Turnstile blob: worker 会失败
+            // default-src 不设为 'self'，否则 Turnstile blob: worker 会失败
             key: 'Content-Security-Policy',
             value: [
-              "default-src 'self' https: data: blob: 'unsafe-inline'",
+              "default-src 'self' https: data: blob:",
               "script-src 'self' https: 'unsafe-inline' 'unsafe-eval' blob:",
               "script-src-attr 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
@@ -42,25 +43,10 @@ const nextConfig = {
               "upgrade-insecure-requests",
             ].join('; '),
           },
-          {
-            // 允许跨域访问 Turnstile SDK / siteverify 资源
-            key: 'Access-Control-Allow-Origin',
-            value: '*',
-          },
-          {
-            key: 'Cross-Origin-Embedder-Policy',
-            value: 'credentialless',
-          },
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin-allow-popups',
-          },
-          {
-            key: 'Cross-Origin-Resource-Policy',
-            value: 'cross-origin',
-          },
-          // 不要设置 X-Frame-Options: DENY/SAMEORIGIN，会和 CSP frame-ancestors 冲突，
-          // 且破坏 Turnstile 的 iframe 容器 postMessage 通道
+          // 注意：此处故意不设置以下头，它们会破坏 Turnstile：
+          //   - Cross-Origin-Embedder-Policy: credentialless —— 会让 Turnstile iframe 拿不到 cookie
+          //   - Cross-Origin-Opener-Policy: same-origin —— 会让 iframe 的 postMessage target origin 为 null
+          //   - Cross-Origin-Resource-Policy: cross-origin —— 会阻断脚本跨域加载
         ],
       },
     ];
