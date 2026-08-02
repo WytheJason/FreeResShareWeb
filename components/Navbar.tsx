@@ -16,6 +16,7 @@ import {
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import type { UserProfile } from '@/lib/types';
 import { getSupabaseBrowser } from '@/lib/supabase';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 
 interface NavItem {
   label: string;
@@ -169,6 +170,8 @@ export default function Navbar() {
 
         {/* 右侧用户区 - 桌面端 */}
         <div className="hidden items-center gap-3 md:flex">
+          {/* 主题切换 */}
+          <ThemeSwitcher />
           {!user && !loading ? (
             <Link href="/login" className="btn-primary">
               登录
@@ -260,14 +263,17 @@ export default function Navbar() {
           ) : null}
         </div>
 
-        {/* 移动端汉堡按钮 */}
-        <button
-          className="text-text-secondary md:hidden"
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-label="菜单"
-        >
-          {menuOpen ? <X size={22} /> : <Menu size={22} />}
-        </button>
+        {/* 移动端：主题切换 + 汉堡按钮 */}
+        <div className="flex items-center gap-2 md:hidden">
+          <ThemeSwitcher />
+          <button
+            className="text-text-secondary"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="菜单"
+          >
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
       </div>
 
       {/* 移动端展开菜单 */}

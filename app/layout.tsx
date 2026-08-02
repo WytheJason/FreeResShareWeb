@@ -57,6 +57,12 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body className="min-h-screen bg-bg-base text-text-primary">
+        {/* 主题防闪烁：首屏前同步读取 localStorage 并设置 data-theme，避免主题切换闪屏 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('theme');var valid=['dark-blue','dark-purple','dark-emerald','light'];var map={'dark-blue':'#0B1220','dark-purple':'#160E26','dark-emerald':'#071310','light':'#F8FAFC'};var theme=(t&&valid.indexOf(t)>=0)?t:'dark-blue';document.documentElement.setAttribute('data-theme',theme);var m=document.querySelector('meta[name="theme-color"]');if(m&&map[theme])m.setAttribute('content',map[theme]);}catch(e){document.documentElement.setAttribute('data-theme','dark-blue');}})();`,
+          }}
+        />
         {/* Google AdSense 加载器：全站自动注入，afterInteractive 不阻塞首屏 */}
         <Script
           async

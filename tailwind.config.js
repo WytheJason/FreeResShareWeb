@@ -8,29 +8,29 @@ module.exports = {
   ],
   theme: {
     extend: {
-      // 主色调：深色科技蓝 + 电光蓝 + VIP金色
+      // 主色调：主题变量（bg/primary/text/border）+ 品牌固定色（gold/状态色）
       colors: {
-        // 背景层级
+        // 背景层级（主题变量，随 data-theme 切换）
         bg: {
-          base: '#0B1220',      // 主背景
-          surface: '#111A2E',   // 卡片表面
-          elevated: '#1A2540',  // 弹层/悬浮
-          hover: '#22305A',     // 悬停态
+          base: 'rgb(var(--bg-base) / <alpha-value>)',
+          surface: 'rgb(var(--bg-surface) / <alpha-value>)',
+          elevated: 'rgb(var(--bg-elevated) / <alpha-value>)',
+          hover: 'rgb(var(--bg-hover) / <alpha-value>)',
         },
-        // 主色（电光蓝）
+        // 主色（主题变量，随主题切换；支持 /透明度 修饰符）
         primary: {
-          50: '#EFF6FF',
-          100: '#DBEAFE',
-          200: '#BFDBFE',
-          300: '#93C5FD',
-          400: '#60A5FA',
-          500: '#3B82F6',
-          600: '#2563EB',
-          700: '#1D4ED8',
-          800: '#1E40AF',
-          900: '#1E3A8A',
+          50: 'rgb(var(--primary-50) / <alpha-value>)',
+          100: 'rgb(var(--primary-100) / <alpha-value>)',
+          200: 'rgb(var(--primary-200) / <alpha-value>)',
+          300: 'rgb(var(--primary-300) / <alpha-value>)',
+          400: 'rgb(var(--primary-400) / <alpha-value>)',
+          500: 'rgb(var(--primary-500) / <alpha-value>)',
+          600: 'rgb(var(--primary-600) / <alpha-value>)',
+          700: 'rgb(var(--primary-700) / <alpha-value>)',
+          800: 'rgb(var(--primary-800) / <alpha-value>)',
+          900: 'rgb(var(--primary-900) / <alpha-value>)',
         },
-        // VIP 金色
+        // VIP 金色（品牌固定色，不随主题切换）
         gold: {
           50: '#FEF9E7',
           100: '#FDF0C4',
@@ -43,21 +43,21 @@ module.exports = {
           800: '#5E4210',
           900: '#3A2A08',
         },
-        // 辅助色
+        // 辅助状态色（固定）
         success: '#10B981',
         warning: '#F59E0B',
         danger: '#EF4444',
-        // 文字层级
+        // 文字层级（主题变量）
         text: {
-          primary: '#F1F5F9',
-          secondary: '#CBD5E1',
-          muted: '#94A3B8',
-          dim: '#64748B',
+          primary: 'rgb(var(--text-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--text-secondary) / <alpha-value>)',
+          muted: 'rgb(var(--text-muted) / <alpha-value>)',
+          dim: 'rgb(var(--text-dim) / <alpha-value>)',
         },
-        // 边框
+        // 边框（主题变量）
         border: {
-          DEFAULT: '#1E293B',
-          subtle: '#334155',
+          DEFAULT: 'rgb(var(--border) / <alpha-value>)',
+          subtle: 'rgb(var(--border-subtle) / <alpha-value>)',
         },
       },
       // 字体

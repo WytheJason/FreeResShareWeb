@@ -3,20 +3,131 @@
 @tailwind utilities;
 
 /* ============================================================
-   全局样式 - 深色科技蓝主题
+   全局样式 - 多主题系统
+   主题通过 <html data-theme="xxx"> 切换，所有主题色用 CSS 变量
+   颜色值采用 "R G B" 空格分隔格式，配合 tailwind 的 <alpha-value>
+   可正常使用 /透明度 修饰符（如 primary-500/20）
    ============================================================ */
 
-:root {
+/* ---------- 默认主题：深空蓝（也作为兜底 :root） ---------- */
+:root,
+[data-theme='dark-blue'] {
   color-scheme: dark;
+  /* 背景层级 */
+  --bg-base: 11 18 32; /* #0B1220 */
+  --bg-surface: 17 26 46; /* #111A2E */
+  --bg-elevated: 26 37 64; /* #1A2540 */
+  --bg-hover: 34 48 90; /* #22305A */
+  /* 主色：电光蓝 */
+  --primary-50: 239 246 255;
+  --primary-100: 219 234 254;
+  --primary-200: 191 219 254;
+  --primary-300: 147 197 253;
+  --primary-400: 96 165 250;
+  --primary-500: 59 130 246;
+  --primary-600: 37 99 235;
+  --primary-700: 29 78 216;
+  --primary-800: 30 64 175;
+  --primary-900: 30 58 138;
+  /* 文字层级 */
+  --text-primary: 241 245 249;
+  --text-secondary: 203 213 225;
+  --text-muted: 148 163 184;
+  --text-dim: 100 116 139;
+  /* 边框 */
+  --border: 30 41 59;
+  --border-subtle: 51 65 85;
 }
+
+/* ---------- 暗夜紫 ---------- */
+[data-theme='dark-purple'] {
+  color-scheme: dark;
+  --bg-base: 22 14 38; /* #160E26 */
+  --bg-surface: 31 20 52; /* #1F1434 */
+  --bg-elevated: 45 30 70; /* #2D1E46 */
+  --bg-hover: 60 41 90; /* #3C295A */
+  --primary-50: 250 245 255;
+  --primary-100: 243 232 255;
+  --primary-200: 233 213 255;
+  --primary-300: 216 180 254;
+  --primary-400: 192 132 252;
+  --primary-500: 168 85 247;
+  --primary-600: 147 51 234;
+  --primary-700: 126 34 206;
+  --primary-800: 107 33 168;
+  --primary-900: 85 27 134;
+  --text-primary: 241 245 249;
+  --text-secondary: 203 213 225;
+  --text-muted: 148 163 184;
+  --text-dim: 100 116 139;
+  --border: 45 32 71;
+  --border-subtle: 68 50 100;
+}
+
+/* ---------- 墨玉绿 ---------- */
+[data-theme='dark-emerald'] {
+  color-scheme: dark;
+  --bg-base: 7 19 16; /* #071310 */
+  --bg-surface: 11 27 22; /* #0B1B16 */
+  --bg-elevated: 16 40 32; /* #102820 */
+  --bg-hover: 22 55 44; /* #16372C */
+  --primary-50: 236 253 245;
+  --primary-100: 209 250 229;
+  --primary-200: 167 243 208;
+  --primary-300: 110 231 183;
+  --primary-400: 52 211 153;
+  --primary-500: 16 185 129;
+  --primary-600: 5 150 105;
+  --primary-700: 4 120 87;
+  --primary-800: 6 95 70;
+  --primary-900: 6 78 59;
+  --text-primary: 236 252 245;
+  --text-secondary: 198 230 218;
+  --text-muted: 148 184 168;
+  --text-dim: 100 132 118;
+  --border: 22 41 35;
+  --border-subtle: 42 68 57;
+}
+
+/* ---------- 日光白（浅色主题） ---------- */
+[data-theme='light'] {
+  color-scheme: light;
+  --bg-base: 248 250 252; /* #F8FAFC */
+  --bg-surface: 255 255 255; /* #FFFFFF */
+  --bg-elevated: 241 245 249; /* #F1F5F9 */
+  --bg-hover: 226 232 240; /* #E2E8F0 */
+  /* 主色整体下移 2 阶保证白底文字对比度 */
+  --primary-50: 219 234 254;
+  --primary-100: 191 219 254;
+  --primary-200: 147 197 253;
+  --primary-300: 59 130 246; /* blue-500，用于文字强调 */
+  --primary-400: 37 99 235; /* blue-600，用于链接 */
+  --primary-500: 37 99 235; /* blue-600 */
+  --primary-600: 29 78 216; /* blue-700 */
+  --primary-700: 30 64 175; /* blue-800 */
+  --primary-800: 30 58 138;
+  --primary-900: 30 41 80;
+  --text-primary: 15 23 42; /* #0F172A */
+  --text-secondary: 51 65 85; /* #334155 */
+  --text-muted: 100 116 139; /* #64748B */
+  --text-dim: 148 163 184; /* #94A3B8 */
+  --border: 226 232 240; /* #E2E8F0 */
+  --border-subtle: 203 213 225; /* #CBD5E1 */
+}
+
+/* ============================================================
+   基础元素
+   ============================================================ */
 
 html,
 body {
-  background-color: #0B1220;
-  color: #F1F5F9;
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  background-color: rgb(var(--bg-base));
+  color: rgb(var(--text-primary));
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* 主题切换平滑过渡 */
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* 自定义滚动条 */
@@ -25,20 +136,20 @@ body {
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #0B1220;
+  background: rgb(var(--bg-base));
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: rgb(var(--border-subtle));
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: rgb(var(--text-dim));
 }
 
 /* 选中文本颜色 */
 ::selection {
-  background: rgba(59, 130, 246, 0.4);
-  color: #F1F5F9;
+  background: rgb(var(--primary-500) / 0.4);
+  color: rgb(var(--text-primary));
 }
 
 /* ============================================================
@@ -46,7 +157,7 @@ body {
    ============================================================ */
 
 @layer components {
-  /* 主按钮 - 电光蓝渐变 */
+  /* 主按钮 - 主色渐变 */
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-primary-600 to-primary-500 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-primary-600/20 transition-all hover:from-primary-500 hover:to-primary-400 hover:shadow-primary-500/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
   }
@@ -56,9 +167,9 @@ body {
     @apply inline-flex items-center justify-center gap-2 rounded-lg border border-border-subtle bg-bg-surface px-4 py-2 text-sm font-medium text-text-secondary transition-all hover:border-primary-500 hover:text-primary-300 active:scale-[0.98];
   }
 
-  /* VIP 金色按钮 */
+  /* VIP 金色按钮（文字用固定深色，避免浅色主题下与金底撞色） */
   .btn-gold {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-gold-500 to-gold-400 px-4 py-2 text-sm font-semibold text-bg-base shadow-lg shadow-gold-500/30 transition-all hover:from-gold-400 hover:to-gold-300 active:scale-[0.98];
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-gold-500 to-gold-400 px-4 py-2 text-sm font-semibold text-gold-900 shadow-lg shadow-gold-500/30 transition-all hover:from-gold-400 hover:to-gold-300 active:scale-[0.98];
   }
 
   /* 危险按钮 */
@@ -113,13 +224,13 @@ body {
    动画
    ============================================================ */
 
-/* 骨架屏 shimmer 效果 */
+/* 骨架屏 shimmer 效果（用主题变量，浅色主题下也协调） */
 .skeleton {
   background: linear-gradient(
     90deg,
-    rgba(30, 41, 59, 0.4) 25%,
-    rgba(51, 65, 85, 0.6) 50%,
-    rgba(30, 41, 59, 0.4) 75%
+    rgb(var(--border) / 0.4) 25%,
+    rgb(var(--border-subtle) / 0.6) 50%,
+    rgb(var(--border) / 0.4) 75%
   );
   background-size: 1000px 100%;
   animation: shimmer 1.5s infinite linear;
