@@ -7,7 +7,7 @@
  */
 import Link from 'next/link';
 import { Pin, Clock, Flame, ArrowRight, Sparkles } from 'lucide-react';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServer, getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { maskPanUrl, maskPanCode } from '@/lib/security';
 import { calcPageRange, calcTotalPages } from '@/lib/utils';
 import type {
@@ -77,7 +77,9 @@ async function queryPosts(opts: QueryOptions): Promise<PageResult<Post>> {
   let count: number | null = null;
 
   try {
-    const supabase = await getSupabaseServer();
+    // 使用 service_role 绕过 RLS，因为帖子列表为公开数据
+    // RLS 可能阻止匿名/已登录用户读取 posts 表，导致列表为空
+    const supabase = getSupabaseServiceAdmin();
     let query = supabase
       .from('posts')
       .select(

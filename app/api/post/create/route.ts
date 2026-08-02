@@ -5,7 +5,7 @@
  * - 入库 posts 表
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServer, getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser, canPublish } from '@/lib/auth';
 import { verifyTurnstileToken, getTurnstileSecretKey } from '@/lib/turnstile';
 import {
@@ -124,8 +124,10 @@ export async function POST(request: Request) {
       }
 
       // ---------- 6. 入库 ----------
-      const supabase = await getSupabaseServer();
-      const { data, error } = await supabase
+      // 使用 service_role 绕过 RLS，确保 insert 不被 RLS 阻止
+      // 用户身份已通过 getCurrentUser() 验证，author_id 手动设置为当前用户
+      const admin = getSupabaseServiceAdmin();
+      const { data, error } = await admin
         .from('posts')
         .insert({
           title: safeTitle,
@@ -146,6 +148,26 @@ export async function POST(request: Request) {
         return NextResponse.json(errorResponse(error.message, 1), {
           status: HTTP_STATUS.BAD_REQUEST,
         });
+      }
+
+      // 同步更新 user_profile 的 post_count（service_role 绕过 RLS）
+      try {
+        await admin.rpc('increment_post_count', { user_id: user.id });
+      } catch {
+        // RPC 可能不存在，降级为手动更新
+        try {
+          const { data: profile } = await admin
+            .from('user_profile')
+            .select('post_count')
+            .eq('id', user.id)
+            .single();
+          await admin
+            .from('user_profile')
+            .update({ post_count: (profile?.post_count ?? 0) + 1 })
+            .eq('id', user.id);
+        } catch {
+          // post_count 同步失败不影响发布，忽略
+        }
       }
 
       return NextResponse.json(

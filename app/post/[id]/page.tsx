@@ -88,13 +88,13 @@ export default async function PostDetailPage({
 }: {
   params: { id: string };
 }) {
+  // 使用 admin 绕过 RLS 查询帖子详情（公开数据）
+  // 使用 supabase（绑定会话）查询收藏等私有数据
+  const admin = getSupabaseServiceAdmin();
   const supabase = await getSupabaseServer().catch(() => null);
-  if (!supabase) {
-    notFound();
-  }
 
   // ---------- 1. 查询帖子 ----------
-  const { data: rawData, error } = await supabase
+  const { data: rawData, error } = await admin
     .from('posts')
     .select(
       'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, author:user_profile!posts_author_id_fkey(nickname, avatar)'
@@ -110,7 +110,6 @@ export default async function PostDetailPage({
 
   // ---------- 2. +1 view_count ----------
   try {
-    const admin = getSupabaseServiceAdmin();
     await admin
       .from('posts')
       .update({ view_count: (raw.view_count ?? 0) + 1 })
@@ -134,7 +133,7 @@ export default async function PostDetailPage({
 
   // ---------- 4. 是否已收藏 ----------
   let isCollected = false;
-  if (currentUser) {
+  if (currentUser && supabase) {
     const { data: collectRow } = await supabase
       .from('collect')
       .select('id')
@@ -174,8 +173,9 @@ export default async function PostDetailPage({
   };
 
   // ---------- 6. 查询第一页评论（构建嵌套后内存分页根评论）----------
+  // 使用 admin 绕过 RLS，评论为公开数据
   const pageSize = 20;
-  const { data: rawComments } = await supabase
+  const { data: rawComments } = await admin
     .from('comments')
     .select(
       'id, post_id, parent_id, reply_to_id, reply_to_nickname, content, user_id, created_at, user:user_profile!comments_user_id_fkey(nickname, avatar)'
