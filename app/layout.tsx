@@ -6,10 +6,14 @@
  */
 
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import './globals.css';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { ToastProvider } from '@/components/Toast';
+
+// Google AdSense 发布商 ID（在 Vercel 环境变量中可通过 NEXT_PUBLIC_ADSENSE_CLIENT 覆盖）
+const ADSENSE_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT || 'ca-pub-5863972767779385';
 
 // ============ SEO 元数据 ============
 export const metadata: Metadata = {
@@ -31,6 +35,12 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  // Google AdSense 站点归属验证
+  verification: {
+    other: {
+      'google-adsense-account': ADSENSE_CLIENT,
+    },
+  },
 };
 
 export const viewport = {
@@ -47,6 +57,13 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body className="min-h-screen bg-bg-base text-text-primary">
+        {/* Google AdSense 加载器：全站自动注入，afterInteractive 不阻塞首屏 */}
+        <Script
+          async
+          strategy="afterInteractive"
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+          crossOrigin="anonymous"
+        />
         <ToastProvider>
           {/* 顶部固定导航 */}
           <Navbar />

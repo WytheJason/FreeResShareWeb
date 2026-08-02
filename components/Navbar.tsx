@@ -148,8 +148,8 @@ export default function Navbar() {
       <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-4">
         {/* 左侧 Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2">
-          <div className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-br from-primary-500 to-primary-700 shadow-lg shadow-primary-600/30">
-            <Sparkles className="text-white" size={18} />
+          <div className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-white shadow-sm">
+            <Sparkles className="text-primary-600" size={18} />
           </div>
           <span className="text-lg font-bold text-text-primary">环梦网盘资源分享论坛</span>
         </Link>
