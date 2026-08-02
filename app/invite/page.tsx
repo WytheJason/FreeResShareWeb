@@ -22,11 +22,17 @@ import {
   Download,
   RefreshCw,
   UserPlus,
+  Crown,
+  Clock,
 } from 'lucide-react';
 import { getSupabaseBrowser } from '@/lib/supabase';
 import { useToast } from '@/components/Toast';
 import { Spinner } from '@/components/Loading';
-import { POINT_RULES, type InviteInfo } from '@/lib/types';
+import {
+  POINT_RULES,
+  INVITE_VIP_REWARDS,
+  type InviteInfo,
+} from '@/lib/types';
 
 export default function InvitePage() {
   const router = useRouter();
@@ -41,6 +47,20 @@ export default function InvitePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [qrReady, setQrReady] = useState(false);
   const [qrError, setQrError] = useState(false);
+
+  // 邀请VIP奖励状态
+  const [vipReward, setVipReward] = useState<{
+    tiers: Array<{
+      required_count: number;
+      reward_days: number;
+      status: 'granted' | 'available' | 'locked';
+      granted_at?: string;
+    }>;
+    vip_active: boolean;
+    vip_expired_at: string | null;
+    newly_granted_days: number;
+  } | null>(null);
+  const [loadingVipReward, setLoadingVipReward] = useState(false);
 
   // ---------- 登录态检查 ----------
   useEffect(() => {
@@ -75,7 +95,35 @@ export default function InvitePage() {
   useEffect(() => {
     if (checking) return;
     loadInviteInfo();
+    loadVipReward();
   }, [checking]);
+
+  // ---------- 加载邀请VIP奖励 ----------
+  async function loadVipReward() {
+    setLoadingVipReward(true);
+    try {
+      const res = await fetch('/api/vip/invite-reward/check', {
+        credentials: 'same-origin',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.code === 0 && data.data) {
+          setVipReward(data.data);
+          // 如果有新发放的奖励，显示提示
+          if (data.data.newly_granted_days > 0) {
+            toast.show(
+              'success',
+              `恭喜！邀请奖励 ${data.data.newly_granted_days} 天 VIP 已发放`
+            );
+          }
+        }
+      }
+    } catch {
+      // 忽略
+    } finally {
+      setLoadingVipReward(false);
+    }
+  }
 
   // ---------- 生成二维码 ----------
   useEffect(() => {
@@ -209,6 +257,128 @@ export default function InvitePage() {
               <div className="mt-1 text-2xl font-bold text-green-300">
                 +{POINT_RULES.INVITE_REWARD}
               </div>
+            </div>
+          </div>
+
+          {/* ---------- 邀请 VIP 奖励阶梯 ---------- */}
+          <div className="card overflow-hidden border-gold-500/20">
+            <div className="border-b border-border bg-gold-500/5 px-5 py-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+                <Crown size={16} className="text-gold-400" />
+                邀请好友送 VIP 会员
+                {vipReward?.vip_active && (
+                  <span className="ml-auto flex items-center gap-1 rounded-full border border-gold-500/30 bg-gold-500/15 px-2 py-0.5 text-xs text-gold-300">
+                    <Clock size={10} />
+                    VIP 有效
+                  </span>
+                )}
+              </h3>
+            </div>
+            <div className="p-5">
+              {loadingVipReward ? (
+                <div className="flex justify-center py-6">
+                  <Spinner />
+                </div>
+              ) : vipReward ? (
+                <>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    {vipReward.tiers.map((tier) => {
+                      const inviteCount = inviteInfo?.invite_count ?? 0;
+                      const progress = Math.min(
+                        100,
+                        (inviteCount / tier.required_count) * 100
+                      );
+                      const isGranted = tier.status === 'granted';
+                      const isAvailable = tier.status === 'available';
+
+                      return (
+                        <div
+                          key={tier.required_count}
+                          className={`rounded-lg border-2 p-4 transition-all ${
+                            isGranted
+                              ? 'border-gold-500/40 bg-gold-500/5'
+                              : isAvailable
+                              ? 'border-primary-500/40 bg-primary-500/5'
+                              : 'border-border bg-bg-surface'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1 text-xs text-text-muted">
+                              <Users size={12} />
+                              邀请 {tier.required_count} 人
+                            </span>
+                            {isGranted && (
+                              <span className="flex items-center gap-0.5 rounded-full bg-gold-500/15 px-2 py-0.5 text-xs text-gold-300">
+                                <Check size={10} />
+                                已领取
+                              </span>
+                            )}
+                            {isAvailable && (
+                              <span className="flex items-center gap-0.5 rounded-full bg-green-500/15 px-2 py-0.5 text-xs text-green-300">
+                                <Crown size={10} />
+                                已达成
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 flex items-baseline gap-1">
+                            <Crown size={14} className="text-gold-400" />
+                            <span className="text-sm font-bold text-gold-300">
+                              +{tier.reward_days} 天 VIP
+                            </span>
+                          </p>
+                          {/* 进度条 */}
+                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-bg-elevated">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                isGranted
+                                  ? 'bg-gold-500'
+                                  : isAvailable
+                                  ? 'bg-green-500'
+                                  : 'bg-primary-500'
+                              }`}
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <p className="mt-1 text-xs text-text-dim">
+                            {inviteCount} / {tier.required_count} 人
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* VIP 到期时间提示 */}
+                  {vipReward.vip_expired_at && (
+                    <div className="mt-4 flex items-center gap-2 rounded-lg border border-gold-500/20 bg-gold-500/5 p-3 text-xs">
+                      <Clock size={14} className="text-gold-400" />
+                      <span className="text-text-muted">
+                        {vipReward.vip_active ? 'VIP 到期时间' : 'VIP 已过期'}：
+                      </span>
+                      <span className="font-medium text-text-primary">
+                        {formatDate(vipReward.vip_expired_at)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 奖励规则说明 */}
+                  <div className="mt-3 rounded-lg border border-border bg-bg-surface p-3 text-xs text-text-muted">
+                    <p className="flex items-center gap-1 font-semibold text-gold-300">
+                      <Gift size={12} />
+                      奖励规则
+                    </p>
+                    <ul className="mt-2 space-y-1">
+                      <li>• 邀请 5 人：赠送 15 天 VIP 会员</li>
+                      <li>• 邀请 15 人：赠送 90 天 VIP 会员</li>
+                      <li>• 邀请 20 人：赠送 180 天 VIP 会员</li>
+                      <li>• 达成条件后自动发放，VIP 天数可叠加</li>
+                    </ul>
+                  </div>
+                </>
+              ) : (
+                <p className="py-4 text-center text-sm text-text-muted">
+                  加载失败，请刷新重试
+                </p>
+              )}
             </div>
           </div>
 

@@ -329,3 +329,141 @@ export interface UserStats {
   /** 成功邀请人数 */
   invite_count: number;
 }
+
+// ============ VIP 套餐 ============
+
+/** 套餐类型 */
+export type VipPlanType = 'limited' | 'permanent';
+
+/** 套餐ID */
+export type VipPlanId = 'month' | 'quarter' | 'year' | 'permanent';
+
+/** VIP 套餐定义 */
+export interface VipPlan {
+  id: VipPlanId;
+  /** 套餐名称 */
+  name: string;
+  /** 价格（元） */
+  price: number;
+  /** VIP 天数（null 表示永久） */
+  days: number | null;
+  /** 套餐类型 */
+  type: VipPlanType;
+  /** 原价（用于显示划线价，可选） */
+  original_price?: number;
+  /** 描述 */
+  desc: string;
+  /** 是否推荐 */
+  highlight?: boolean;
+}
+
+/** VIP 套餐列表 */
+export const VIP_PLANS: VipPlan[] = [
+  {
+    id: 'month',
+    name: '月卡',
+    price: 4.9,
+    days: 30,
+    type: 'limited',
+    desc: '灵活开通，按月续费',
+  },
+  {
+    id: 'quarter',
+    name: '季卡',
+    price: 12.9,
+    days: 90,
+    type: 'limited',
+    original_price: 14.7,
+    desc: '超值季卡，日均不到 5 分',
+  },
+  {
+    id: 'year',
+    name: '年卡',
+    price: 59.9,
+    days: 365,
+    type: 'limited',
+    original_price: 58.8,
+    desc: '年度优选，畅享 365 天',
+    highlight: true,
+  },
+  {
+    id: 'permanent',
+    name: '永久卡',
+    price: 69.9,
+    days: null,
+    type: 'permanent',
+    desc: '一次开通，终身免费',
+  },
+];
+
+/** 根据 ID 获取套餐 */
+export function getVipPlan(id: string): VipPlan | undefined {
+  return VIP_PLANS.find((p) => p.id === id);
+}
+
+// ============ 邀请 VIP 奖励阶梯 ============
+
+export interface InviteVipRewardTier {
+  /** 需要的邀请人数 */
+  required_count: number;
+  /** 奖励 VIP 天数 */
+  reward_days: number;
+}
+
+/** 邀请 VIP 奖励阶梯 */
+export const INVITE_VIP_REWARDS: InviteVipRewardTier[] = [
+  { required_count: 5, reward_days: 15 },
+  { required_count: 15, reward_days: 90 },
+  { required_count: 20, reward_days: 180 },
+];
+
+// ============ VIP 订单 ============
+
+export type VipOrderStatus = 'pending' | 'paid' | 'expired' | 'failed';
+
+/** VIP 订单 */
+export interface VipOrder {
+  id: string;
+  /** 订单号 */
+  order_no: string;
+  /** 用户ID */
+  user_id: string;
+  /** 套餐ID */
+  plan_id: VipPlanId;
+  /** 套餐名称 */
+  plan_name: string;
+  /** 金额 */
+  amount: number;
+  /** VIP 天数 */
+  days: number | null;
+  /** 套餐类型 */
+  plan_type: VipPlanType;
+  /** 支付方式 */
+  pay_type: string | null;
+  /** 订单状态 */
+  status: VipOrderStatus;
+  /** 易支付交易号 */
+  trade_no: string | null;
+  /** 支付时间 */
+  paid_at: string | null;
+  /** 创建时间 */
+  created_at: string;
+  /** 更新时间 */
+  updated_at: string;
+}
+
+// ============ 邀请 VIP 奖励记录 ============
+
+export interface InviteVipReward {
+  id: string;
+  /** 用户ID */
+  user_id: string;
+  /** 邀请人数阶梯 */
+  required_count: number;
+  /** 奖励天数 */
+  reward_days: number;
+  /** 状态 */
+  status: 'granted' | 'revoked';
+  /** 发放时间 */
+  granted_at: string;
+}
