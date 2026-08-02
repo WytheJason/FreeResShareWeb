@@ -11,6 +11,7 @@ import {
   Sparkles,
   ChevronDown,
   Coins,
+  UserPlus,
 } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import type { UserProfile } from '@/lib/types';
@@ -21,12 +22,15 @@ interface NavItem {
   href: string;
   /** 是否仅管理员可见 */
   adminOnly?: boolean;
+  /** 是否仅登录用户可见 */
+  authOnly?: boolean;
 }
 
 // 顶部导航项
 const NAV_ITEMS: NavItem[] = [
   { label: '首页', href: '/' },
   { label: '发布资源', href: '/publish' },
+  { label: '邀请好友', href: '/invite', authOnly: true },
   { label: 'VIP 专区', href: '/vip' },
   { label: '管理员后台', href: '/admin', adminOnly: true },
 ];
@@ -132,8 +136,12 @@ export default function Navbar() {
     router.push('/');
   }
 
-  // 过滤可见导航项（管理员后台仅管理员可见）
-  const visibleNavItems = NAV_ITEMS.filter((item) => !item.adminOnly || user?.is_admin);
+  // 过滤可见导航项（管理员后台仅管理员可见，邀请好友仅登录用户可见）
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) =>
+      (!item.adminOnly || user?.is_admin) &&
+      (!item.authOnly || user)
+  );
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 h-16 border-b border-border bg-bg-base/80 backdrop-blur">
@@ -215,6 +223,14 @@ export default function Navbar() {
                       </div>
                     )}
                     <Link
+                      href="/invite"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-hover"
+                    >
+                      <UserPlus size={14} />
+                      邀请好友
+                    </Link>
+                    <Link
                       href={`/user/${user.id}?tab=points`}
                       onClick={() => setUserMenuOpen(false)}
                       className="flex items-center gap-2 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-hover"
@@ -288,6 +304,14 @@ export default function Navbar() {
                     <span className="font-bold text-purple-300">{points}</span>
                   </div>
                 )}
+                <Link
+                  href="/invite"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-hover"
+                >
+                  <UserPlus size={14} />
+                  邀请好友
+                </Link>
                 <Link
                   href={`/user/${user.id}?tab=points`}
                   onClick={() => setMenuOpen(false)}
