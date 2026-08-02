@@ -9,9 +9,9 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Palette, Check, Sun, Moon, Sparkles, Leaf } from 'lucide-react';
+import { Palette, Check, Sun, Moon, Sparkles, Leaf, Contrast } from 'lucide-react';
 
-export type ThemeId = 'dark-blue' | 'dark-purple' | 'dark-emerald' | 'light';
+export type ThemeId = 'dark-blue' | 'dark-purple' | 'dark-emerald' | 'black' | 'light';
 
 interface ThemeMeta {
   id: ThemeId;
@@ -51,6 +51,14 @@ export const THEMES: ThemeMeta[] = [
     swatch: '#10B981',
     bg: '#071310',
     icon: Leaf,
+  },
+  {
+    id: 'black',
+    name: '纯黑',
+    desc: 'AMOLED · 纯黑省电',
+    swatch: '#3B82F6',
+    bg: '#000000',
+    icon: Contrast,
   },
   {
     id: 'light',
