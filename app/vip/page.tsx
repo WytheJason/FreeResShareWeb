@@ -21,6 +21,7 @@ import { formatDateTime } from '@/lib/utils';
 import VipBadge from '@/components/VipBadge';
 import VipPurchaseClient from './VipPurchaseClient';
 import { Spinner } from '@/components/Loading';
+import AdSense from '@/components/AdSense';
 import type { ReactNode } from 'react';
 
 // ============ 权益项配置 ============
@@ -195,6 +196,11 @@ export default async function VipPage() {
       </section>
 
       {/* ============ 在线购买套餐 ============ */}
+      {/* 广告位：VIP 权益与购买套餐之间 */}
+      <AdSense
+        slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_VIP}
+        label="赞助内容"
+      />
       <section id="open-vip" className="scroll-mt-24">
         <Suspense
           fallback={

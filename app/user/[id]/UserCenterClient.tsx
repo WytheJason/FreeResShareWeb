@@ -45,6 +45,7 @@ import Pagination from '@/components/Pagination';
 import Empty from '@/components/Empty';
 import VipBadge from '@/components/VipBadge';
 import TurnstileWidget, { type TurnstileWidgetHandle } from '@/components/TurnstileWidget';
+import AdSense from '@/components/AdSense';
 import PointsPanel from './PointsPanel';
 import { useToast } from '@/components/Toast';
 
@@ -711,6 +712,12 @@ export default function UserCenterClient({
           />
         </div>
       )}
+
+      {/* 广告位：个人主页底部（分页后，非侵入式） */}
+      <AdSense
+        slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_USER}
+        label="赞助内容"
+      />
 
       {/* ===== 编辑资料对话框 ===== */}
       {editOpen && (
