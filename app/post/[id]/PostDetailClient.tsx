@@ -101,14 +101,20 @@ export default function PostDetailClient({
     if (!window.confirm('确定删除该帖子吗？删除后不可恢复')) return;
     try {
       const res = await fetch('/api/post/delete', {
-        method: 'DELETE',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: post.id }),
       });
       const json = await res.json();
       if (json.code === 0) {
         toast.show('success', '删除成功');
-        router.push('/');
+        // 先刷新再跳转，确保首页服务端组件重新拉取数据
+        router.refresh();
+        setTimeout(() => {
+          router.push('/');
+          // 跳转后再次刷新，双重保险
+          setTimeout(() => router.refresh(), 50);
+        }, 50);
       } else {
         toast.show('error', json.message || '删除失败');
       }

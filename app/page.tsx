@@ -3,11 +3,18 @@
  * - Hero 区：渐变背景 + 大标题 + 搜索框 + 分类筛选
  * - 三大分区：置顶 / 最新 / 热门（默认视图）
  * - 搜索/筛选/分页视图：单一列表 + 分页（URL 驱动）
- * 数据通过 getSupabaseServer() 直连数据库查询，避免 HTTP 自调用
+ * 数据通过 getSupabaseServiceAdmin() 直连数据库查询，绕过 RLS
+ *
+ * 重要：必须 force-dynamic，否则 Next.js 会缓存页面，
+ * 导致发布新资源后首页不刷新
  */
 import Link from 'next/link';
+
+// 强制动态渲染，避免页面被缓存导致新发布的资源不显示
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 import { Pin, Clock, Flame, ArrowRight, Sparkles } from 'lucide-react';
-import { getSupabaseServer, getSupabaseServiceAdmin } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { maskPanUrl, maskPanCode } from '@/lib/security';
 import { calcPageRange, calcTotalPages } from '@/lib/utils';
 import type {
@@ -53,6 +60,7 @@ interface PostRow {
   author_id: string;
   created_at: string;
   updated_at: string;
+  points_cost: number;
   author: { nickname: string; avatar: string }[] | { nickname: string; avatar: string } | null;
 }
 
@@ -83,7 +91,7 @@ async function queryPosts(opts: QueryOptions): Promise<PageResult<Post>> {
     let query = supabase
       .from('posts')
       .select(
-        'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, author:user_profile!posts_author_id_fkey(nickname, avatar)',
+        'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, points_cost, author:user_profile!posts_author_id_fkey(nickname, avatar)',
         { count: 'exact' }
       )
       .eq('status', 'normal');
@@ -160,6 +168,7 @@ async function queryPosts(opts: QueryOptions): Promise<PageResult<Post>> {
       author_avatar: author.avatar ?? '',
       created_at: item.created_at,
       updated_at: item.updated_at,
+      points_cost: item.points_cost ?? 0,
     };
   });
 

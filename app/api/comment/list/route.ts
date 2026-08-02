@@ -6,7 +6,7 @@
  * - 返回 PageResult<Comment>（list 为根评论，每个含 children）
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import {
   successResponse,
   errorResponse,
@@ -15,6 +15,10 @@ import {
   calcTotalPages,
 } from '@/lib/utils';
 import type { Comment, PageResult } from '@/lib/types';
+
+// 禁止缓存，确保增删改后数据立即同步
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: Request) {
   try {
@@ -29,7 +33,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const supabase = await getSupabaseServer();
+    const supabase = getSupabaseServiceAdmin();
 
     // ---------- 1. 查询所有评论（按 created_at asc，便于构建嵌套）----------
     // 这里采用查询全量后服务端构建嵌套 + 内存分页返回根评论的方式

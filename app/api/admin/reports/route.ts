@@ -18,6 +18,10 @@ import type { Report, PageResult, ReportStatus } from '@/lib/types';
 
 const STATUS_SET: ReportStatus[] = ['pending', 'handled', 'archived'];
 
+// 禁止缓存，确保增删改后数据立即同步
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: Request) {
   try {
     // ---------- 1. 管理员校验 ----------

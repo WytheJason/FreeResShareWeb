@@ -5,8 +5,12 @@
  * - 收藏/浏览记录仅本人可见，他人访问显示"无权限"
  */
 
+// 禁止缓存，确保增删改后数据立即同步
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { notFound } from 'next/navigation';
-import { getSupabaseServer, getSupabaseServiceAdmin } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser } from '@/lib/auth';
 import { maskPanUrl, maskPanCode } from '@/lib/security';
 import { calcPageRange, calcTotalPages } from '@/lib/utils';
@@ -24,7 +28,7 @@ import UserCenterClient, {
 } from './UserCenterClient';
 
 const PAGE_SIZE = 12;
-const VALID_TABS: TabKey[] = ['posts', 'comments', 'collects', 'history'];
+const VALID_TABS: TabKey[] = ['posts', 'comments', 'collects', 'history', 'points'];
 
 // 帖子原始查询结果（含作者关联）
 interface PostRaw {
@@ -45,6 +49,7 @@ interface PostRaw {
   author_id: string;
   created_at: string;
   updated_at: string;
+  points_cost: number;
   author: unknown;
 }
 
@@ -94,11 +99,12 @@ function toPost(raw: PostRaw): Post {
     author_avatar: a?.avatar ?? '',
     created_at: raw.created_at,
     updated_at: raw.updated_at,
+    points_cost: raw.points_cost ?? 0,
   };
 }
 
 const POST_SELECT =
-  'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, author:user_profile!posts_author_id_fkey(nickname, avatar)';
+  'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, points_cost, author:user_profile!posts_author_id_fkey(nickname, avatar)';
 
 export default async function UserPage({
   params,
@@ -131,8 +137,8 @@ export default async function UserPage({
     ? profileRaw
     : { ...profileRaw, email: '' };
 
-  // 用户级数据查询使用绑定会话的客户端（受 RLS 约束，保护私有数据）
-  const supabase = await getSupabaseServer().catch(() => null);
+  // 用户级数据查询统一使用 admin 绕过 RLS（权限已在 API 层校验）
+  // 避免 RLS 递归或策略配置问题导致查询失败
 
   // ---------- 1.5. 统计数据（仅本人可见额外信息）----------
   const userStats: UserStats = {
@@ -140,14 +146,16 @@ export default async function UserPage({
     comment_count: profile.comment_count,
     collect_count: 0,
     view_count: 0,
+    points: profile.points ?? 0,
+    invite_count: profile.invite_count ?? 0,
   };
-  if (isOwner && supabase) {
+  if (isOwner) {
     const [{ count: collectCount }, { count: viewCount }] = await Promise.all([
-      supabase
+      admin
         .from('collect')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', params.id),
-      supabase
+      admin
         .from('view_history')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', params.id),
@@ -206,34 +214,29 @@ export default async function UserPage({
       total = count ?? 0;
     } else if (tab === 'collects') {
       // 本人收藏：关联帖子，返回完整 Post 列表
-      // supabase 可能为 null（session 异常），此时返回空列表
-      if (supabase) {
-        const { data, count } = await supabase
-          .from('collect')
-          .select(`id, post_id, post:posts!collect_post_id_fkey(${POST_SELECT})`, {
-            count: 'exact',
-          })
-          .eq('user_id', params.id)
-          .order('created_at', { ascending: false })
-          .range(from, to);
-        list = ((data ?? []) as CollectRaw[])
-          .map((item) => pickFirst<PostRaw>(item.post))
-          .filter((p): p is PostRaw => !!p)
-          .map(toPost);
-        total = count ?? 0;
-      }
+      const { data, count } = await admin
+        .from('collect')
+        .select(`id, post_id, post:posts!collect_post_id_fkey(${POST_SELECT})`, {
+          count: 'exact',
+        })
+        .eq('user_id', params.id)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+      list = ((data ?? []) as CollectRaw[])
+        .map((item) => pickFirst<PostRaw>(item.post))
+        .filter((p): p is PostRaw => !!p)
+        .map(toPost);
+      total = count ?? 0;
     } else if (tab === 'history') {
       // 浏览记录：按 view_count 倒序的推荐帖子
-      if (supabase) {
-        const { data, count } = await supabase
-          .from('posts')
-          .select(POST_SELECT, { count: 'exact' })
-          .eq('status', 'normal')
-          .order('view_count', { ascending: false })
-          .range(from, to);
-        list = ((data ?? []) as PostRaw[]).map(toPost);
-        total = count ?? 0;
-      }
+      const { data, count } = await admin
+        .from('posts')
+        .select(POST_SELECT, { count: 'exact' })
+        .eq('status', 'normal')
+        .order('view_count', { ascending: false })
+        .range(from, to);
+      list = ((data ?? []) as PostRaw[]).map(toPost);
+      total = count ?? 0;
     }
   }
 

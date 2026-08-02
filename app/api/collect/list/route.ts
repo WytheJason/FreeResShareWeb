@@ -5,7 +5,7 @@
  * - 返回 PageResult<Collect>
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser } from '@/lib/auth';
 import {
   successResponse,
@@ -15,6 +15,10 @@ import {
   calcTotalPages,
 } from '@/lib/utils';
 import type { Collect, PageResult } from '@/lib/types';
+
+// 禁止缓存，确保增删改后数据立即同步
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: Request) {
   try {
@@ -30,7 +34,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const supabase = await getSupabaseServer();
+    const supabase = getSupabaseServiceAdmin();
 
     // ---------- 2. 查询收藏列表 ----------
     const { from, to } = calcPageRange(page, pageSize);

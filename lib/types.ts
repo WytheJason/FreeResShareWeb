@@ -6,6 +6,41 @@
 // ============ 用户角色 ============
 export type UserRole = 'guest' | 'user' | 'vip' | 'admin';
 
+// ============ 积分变动类型 ============
+export type PointAction =
+  | 'register'        // 注册奖励
+  | 'invite_reward'   // 邀请好友奖励
+  | 'invited_bonus'   // 被邀请奖励
+  | 'post_reward'     // 发帖奖励
+  | 'comment_reward'  // 评论奖励
+  | 'unlock_post'     // 解锁资源消费
+  | 'admin_adjust';   // 管理员调整
+
+// ============ 积分规则常量 ============
+export const POINT_RULES = {
+  /** 注册奖励积分 */
+  REGISTER_REWARD: 10,
+  /** 邀请好友奖励积分（邀请人获得） */
+  INVITE_REWARD: 20,
+  /** 被邀请奖励积分（新用户额外获得） */
+  INVITED_BONUS: 5,
+  /** 发帖奖励积分 */
+  POST_REWARD: 2,
+  /** 评论奖励积分 */
+  COMMENT_REWARD: 1,
+} as const;
+
+// ============ 积分变动类型标签映射 ============
+export const POINT_ACTION_LABELS: Record<PointAction, string> = {
+  register: '注册奖励',
+  invite_reward: '邀请好友奖励',
+  invited_bonus: '被邀请奖励',
+  post_reward: '发帖奖励',
+  comment_reward: '评论奖励',
+  unlock_post: '解锁资源消费',
+  admin_adjust: '管理员调整',
+};
+
 // ============ 帖子分类 ============
 export type PostCategory = 'software' | 'movie';
 
@@ -46,6 +81,16 @@ export interface UserProfile {
   post_count: number;
   comment_count: number;
   created_at: string;
+  /** 当前积分余额 */
+  points: number;
+  /** 累计获得积分 */
+  total_earned_points: number;
+  /** 专属邀请码 */
+  invite_code: string | null;
+  /** 邀请人ID */
+  invited_by: string | null;
+  /** 成功邀请人数 */
+  invite_count: number;
 }
 
 // ============ 帖子（列表/详情通用）============
@@ -69,6 +114,8 @@ export interface Post {
   author_avatar: string;
   created_at: string;
   updated_at: string;
+  /** 查看资源链接所需积分（0=免费公开） */
+  points_cost: number;
 }
 
 // ============ 帖子详情（带权限脱敏标记）============
@@ -83,6 +130,8 @@ export interface PostDetail extends Post {
   is_author: boolean;
   /** 脱敏后的网盘链接（无权查看时） */
   masked_pan_url?: string;
+  /** 当前用户是否已用积分解锁此资源 */
+  is_unlocked: boolean;
 }
 
 // ============ 评论（楼中楼）============
@@ -194,6 +243,8 @@ export interface PostForm {
   pan_url: string;
   pan_code: string;
   is_vip: boolean;
+  /** 查看资源所需积分（0=免费），范围 0-100 */
+  points_cost: number;
 }
 
 // ============ 网盘类型标签映射 ============
@@ -222,3 +273,59 @@ export const VIP_ACTION_LABELS: Record<VipAction, string> = {
   renew: '续费',
   cancel: '取消',
 };
+
+// ============ 积分流水记录 ============
+export interface PointLog {
+  id: string;
+  user_id: string;
+  /** 变动金额（正=获得，负=消费） */
+  change_amount: number;
+  /** 变动后余额 */
+  balance_after: number;
+  action: PointAction;
+  post_id: string | null;
+  related_user_id: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+// ============ 邀请关系记录 ============
+export interface InviteRelation {
+  id: string;
+  inviter_id: string;
+  invitee_id: string;
+  invite_code: string;
+  reward_points: number;
+  status: 'success' | 'revoked';
+  created_at: string;
+  /** 被邀请人昵称（联表查询） */
+  invitee_nickname?: string;
+  /** 被邀请人头像 */
+  invitee_avatar?: string;
+}
+
+// ============ 邀请信息汇总 ============
+export interface InviteInfo {
+  /** 当前用户邀请码 */
+  invite_code: string;
+  /** 邀请链接 */
+  invite_url: string;
+  /** 成功邀请人数 */
+  invite_count: number;
+  /** 邀请获得的总积分 */
+  total_invite_points: number;
+  /** 最近邀请记录 */
+  recent_invites: InviteRelation[];
+}
+
+// ============ 用户统计数据（含积分）============
+export interface UserStats {
+  post_count: number;
+  comment_count: number;
+  collect_count: number;
+  view_count: number;
+  /** 当前积分余额 */
+  points: number;
+  /** 成功邀请人数 */
+  invite_count: number;
+}

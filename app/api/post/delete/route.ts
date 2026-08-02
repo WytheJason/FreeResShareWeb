@@ -5,11 +5,11 @@
  * - 数据库设置 on delete cascade 级联删除评论/收藏/举报
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 import { successResponse, errorResponse, HTTP_STATUS } from '@/lib/utils';
 
-export async function DELETE(request: Request) {
+export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { id } = body as { id: string };
@@ -27,10 +27,10 @@ export async function DELETE(request: Request) {
       });
     }
 
-    const supabase = await getSupabaseServer();
+    const admin = getSupabaseServiceAdmin();
 
     // ---------- 2. 查询帖子校验权限 ----------
-    const { data: post, error: queryError } = await supabase
+    const { data: post, error: queryError } = await admin
       .from('posts')
       .select('id, author_id')
       .eq('id', id)
@@ -50,7 +50,7 @@ export async function DELETE(request: Request) {
     }
 
     // ---------- 3. 执行删除（级联由数据库处理）----------
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await admin
       .from('posts')
       .delete()
       .eq('id', id);

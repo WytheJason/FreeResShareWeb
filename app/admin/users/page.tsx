@@ -4,6 +4,11 @@
  * - 支持 ?page=&q= 查询参数
  * - 将初始数据传入客户端组件 UsersTable
  */
+
+// 禁止缓存，确保增删改后数据立即同步
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { calcPageRange, calcTotalPages } from '@/lib/utils';
 import type { UserProfile } from '@/lib/types';

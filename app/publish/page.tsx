@@ -19,6 +19,7 @@ import {
   Crown,
   Image as ImageIcon,
   AlertTriangle,
+  Coins,
 } from 'lucide-react';
 import { getSupabaseBrowser } from '@/lib/supabase';
 import { isValidPanCode } from '@/lib/utils';
@@ -66,32 +67,54 @@ export default function PublishPage() {
   const [panCode, setPanCode] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
   const [isVip, setIsVip] = useState(false);
+  const [pointsCost, setPointsCost] = useState(0);
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
 
   // 获取当前登录用户（用于封面上传路径与 VIP 提示）
+  // 未登录时自动跳转到登录页
+  const [checking, setChecking] = useState(true);
   useEffect(() => {
     const supabase = getSupabaseBrowser();
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        const meta = (data.user.user_metadata ?? {}) as Record<string, unknown>;
-        setUser({
-          id: data.user.id,
-          email: data.user.email ?? '',
-          nickname: (meta.nickname as string) ?? '',
-          avatar: (meta.avatar as string) ?? '',
-          bio: (meta.bio as string) ?? '',
-          is_admin: Boolean(meta.is_admin),
-          is_vip: Boolean(meta.is_vip),
-          vip_started_at: (meta.vip_started_at as string) ?? null,
-          vip_expired_at: (meta.vip_expired_at as string) ?? null,
-          is_banned: Boolean(meta.is_banned),
-          post_count: Number(meta.post_count ?? 0),
-          comment_count: Number(meta.comment_count ?? 0),
-          created_at: (meta.created_at as string) ?? '',
-        });
+      if (!data.user) {
+        // 未登录，跳转到登录页，登录后回到发布页
+        router.replace('/login?redirect=/publish');
+        return;
       }
+      const meta = (data.user.user_metadata ?? {}) as Record<string, unknown>;
+      setUser({
+        id: data.user.id,
+        email: data.user.email ?? '',
+        nickname: (meta.nickname as string) ?? '',
+        avatar: (meta.avatar as string) ?? '',
+        bio: (meta.bio as string) ?? '',
+        is_admin: Boolean(meta.is_admin),
+        is_vip: Boolean(meta.is_vip),
+        vip_started_at: (meta.vip_started_at as string) ?? null,
+        vip_expired_at: (meta.vip_expired_at as string) ?? null,
+        is_banned: Boolean(meta.is_banned),
+        post_count: Number(meta.post_count ?? 0),
+        comment_count: Number(meta.comment_count ?? 0),
+        created_at: (meta.created_at as string) ?? '',
+        // 积分相关字段（user_metadata 通常不含，发布页主要用 id/nickname/is_vip）
+        points: Number(meta.points ?? 0),
+        total_earned_points: Number(meta.total_earned_points ?? 0),
+        invite_code: (meta.invite_code as string) ?? null,
+        invited_by: (meta.invited_by as string) ?? null,
+        invite_count: Number(meta.invite_count ?? 0),
+      });
+      setChecking(false);
     });
-  }, []);
+  }, [router]);
+
+  // 登录校验中显示加载状态，避免未登录用户看到表单
+  if (checking) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
 
   // ============ 封面图上传 ============
   async function handleCoverUpload(e: ChangeEvent<HTMLInputElement>) {
@@ -182,6 +205,7 @@ export default function PublishPage() {
       pan_url: panUrl.trim(),
       pan_code: panCode.trim(),
       is_vip: isVip,
+      points_cost: Math.max(0, Math.min(100, Number(pointsCost) || 0)),
     };
 
     setLoading(true);
@@ -210,9 +234,14 @@ export default function PublishPage() {
       const data = await res.json();
       if (data.code === 0 && data.data?.id) {
         toast.show('success', '发布成功');
-        // 跳转到帖子详情页，router.push 会触发页面刷新
-        router.push(`/post/${data.data.id}`);
+        // 先刷新服务端组件（清空 Next 路由器的服务端渲染缓存）
         router.refresh();
+        // 小延迟后跳转到详情页，确保 refresh 生效
+        setTimeout(() => {
+          router.push(`/post/${data.data.id}`);
+          // 跳转后再次刷新，双重保险
+          setTimeout(() => router.refresh(), 80);
+        }, 80);
       } else {
         toast.show('error', data.message || '发布失败');
         turnstileRef.current?.reset();
@@ -476,7 +505,47 @@ export default function PublishPage() {
             </button>
           </div>
 
-          {/* 极验验证 */}
+          {/* 积分费用设置 */}
+          <div className="rounded-lg border border-border bg-bg-surface px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Coins size={14} className="text-purple-400" />
+              <span className="text-sm font-medium text-text-primary">
+                积分查看费用
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              设置后用户需消耗积分才能查看资源链接（0 表示免费公开）
+            </p>
+            <div className="mt-3 flex items-center gap-3">
+              <input
+                type="range"
+                min={0}
+                max={50}
+                step={1}
+                value={pointsCost}
+                onChange={(e) => setPointsCost(Number(e.target.value))}
+                className="flex-1 accent-purple-500"
+              />
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={pointsCost}
+                  onChange={(e) => setPointsCost(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                  className="input-field w-20 text-center"
+                />
+                <span className="text-xs text-text-muted">积分</span>
+              </div>
+            </div>
+            {pointsCost > 0 && (
+              <p className="mt-2 text-xs text-purple-300">
+                用户查看此资源需消耗 {pointsCost} 积分，你将获得发帖奖励
+              </p>
+            )}
+          </div>
+
+          {/* 人机验证 */}
           <div>
             <label className="mb-1 block text-xs text-text-muted">
               人机验证 <span className="text-danger">*</span>

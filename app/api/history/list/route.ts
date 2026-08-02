@@ -5,7 +5,7 @@
  * - 实际查询：posts 表 status=normal，order by view_count desc，limit page_size
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser } from '@/lib/auth';
 import {
   successResponse,
@@ -16,6 +16,10 @@ import {
 } from '@/lib/utils';
 import { maskPanUrl, maskPanCode } from '@/lib/security';
 import type { Post, PageResult } from '@/lib/types';
+
+// 禁止缓存，确保增删改后数据立即同步
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: Request) {
   try {
@@ -31,7 +35,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const supabase = await getSupabaseServer();
+    const supabase = getSupabaseServiceAdmin();
 
     // ---------- 2. 查询热门帖子（推荐数据）----------
     // 说明：浏览记录功能依赖客户端 localStorage 上报，本接口暂以"按 view_count 倒序"返回推荐数据

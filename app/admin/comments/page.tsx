@@ -72,7 +72,7 @@ export default function AdminCommentsPage() {
     try {
       setDeletingId(id);
       const res = await fetch('/api/comment/delete', {
-        method: 'DELETE',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });

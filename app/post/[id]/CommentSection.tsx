@@ -106,6 +106,8 @@ export default function CommentSection({
         setReplyInfo(null);
         turnstileRef.current?.reset();
         await fetchComments(comments.page);
+        // 刷新服务端组件，同步 comment_count
+        router.refresh();
       } else {
         toast.show('error', json.message || '评论失败');
         turnstileRef.current?.reset();
@@ -128,7 +130,7 @@ export default function CommentSection({
     if (!window.confirm('确定删除该评论吗？')) return;
     try {
       const res = await fetch('/api/comment/delete', {
-        method: 'DELETE',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });
@@ -136,6 +138,7 @@ export default function CommentSection({
       if (json.code === 0) {
         toast.show('success', '删除成功');
         await fetchComments(comments.page);
+        router.refresh();
       } else {
         toast.show('error', json.message || '删除失败');
       }

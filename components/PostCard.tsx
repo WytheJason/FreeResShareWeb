@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Eye, MessageCircle, Crown, Pin } from 'lucide-react';
+import { Eye, MessageCircle, Crown, Pin, Coins } from 'lucide-react';
 import type { Post } from '@/lib/types';
 import { CATEGORY_LABELS } from '@/lib/types';
 import { formatRelativeTime } from '@/lib/utils';
@@ -42,7 +42,7 @@ export default function PostCard({ post }: PostCardProps) {
           {CATEGORY_LABELS[post.category]}
         </span>
 
-        {/* 置顶 / VIP 标签 - 右上角 */}
+        {/* 置顶 / VIP / 积分 标签 - 右上角 */}
         <div className="absolute right-2 top-2 flex gap-1">
           {post.is_top && (
             <span className="tag bg-danger/20 text-danger">
@@ -54,6 +54,12 @@ export default function PostCard({ post }: PostCardProps) {
             <span className="tag tag-vip">
               <Crown size={10} />
               VIP
+            </span>
+          )}
+          {post.points_cost > 0 && (
+            <span className="tag bg-purple-500/20 text-purple-300">
+              <Coins size={10} />
+              {post.points_cost}积分
             </span>
           )}
         </div>

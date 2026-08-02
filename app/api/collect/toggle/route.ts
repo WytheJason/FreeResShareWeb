@@ -4,7 +4,7 @@
  * - 已存在 → delete；不存在 → insert
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser } from '@/lib/auth';
 import { successResponse, errorResponse, HTTP_STATUS } from '@/lib/utils';
 
@@ -26,10 +26,10 @@ export async function POST(request: Request) {
       });
     }
 
-    const supabase = await getSupabaseServer();
+    const admin = getSupabaseServiceAdmin();
 
     // ---------- 2. 查询是否已收藏 ----------
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from('collect')
       .select('id')
       .eq('user_id', user.id)
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
     if (existing) {
       // ---------- 已存在 → 取消收藏 ----------
-      const { error } = await supabase
+      const { error } = await admin
         .from('collect')
         .delete()
         .eq('id', existing.id);
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     // ---------- 不存在 → 新增收藏 ----------
-    const { error } = await supabase.from('collect').insert({
+    const { error } = await admin.from('collect').insert({
       user_id: user.id,
       post_id,
     });

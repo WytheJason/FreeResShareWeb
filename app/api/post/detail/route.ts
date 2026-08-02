@@ -6,7 +6,7 @@
  * - 无权限时脱敏返回
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer, getSupabaseServiceAdmin } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import {
   getCurrentUser,
   canViewPublicResource,
@@ -15,6 +15,10 @@ import {
 import { maskPanUrl, maskPanCode } from '@/lib/security';
 import { successResponse, errorResponse, HTTP_STATUS } from '@/lib/utils';
 import type { PostDetail } from '@/lib/types';
+
+// 禁止缓存，确保增删改后数据立即同步
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: Request) {
   try {
@@ -26,13 +30,13 @@ export async function GET(request: Request) {
       });
     }
 
-    const supabase = await getSupabaseServer();
+    const supabase = getSupabaseServiceAdmin();
 
     // ---------- 1. 查询帖子 ----------
     const { data: post, error } = await supabase
       .from('posts')
       .select(
-        'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, author:user_profile!posts_author_id_fkey(nickname, avatar)'
+        'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, points_cost, author:user_profile!posts_author_id_fkey(nickname, avatar)'
       )
       .eq('id', id)
       .single();
@@ -62,10 +66,29 @@ export async function GET(request: Request) {
     const isAuthor = !!user && user.id === post.author_id;
     let canViewLink = false;
     let canViewCode = false;
+    let isUnlocked = false;
     if (post.is_vip) {
       // VIP 资源
       canViewLink = canViewVipResource(user, post.author_id);
       canViewCode = canViewVipResource(user, post.author_id);
+    } else if ((post as any).points_cost > 0) {
+      // 积分资源：作者免解锁；其他用户需查询 post_unlock 表
+      if (isAuthor) {
+        isUnlocked = true;
+        canViewLink = true;
+        canViewCode = true;
+      } else if (user) {
+        const admin = getSupabaseServiceAdmin();
+        const { data: unlockRow } = await admin
+          .from('post_unlock')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('post_id', id)
+          .maybeSingle();
+        isUnlocked = !!unlockRow;
+        canViewLink = isUnlocked;
+        canViewCode = isUnlocked;
+      }
     } else {
       // 公开资源
       canViewLink = canViewPublicResource(user);
@@ -73,18 +96,18 @@ export async function GET(request: Request) {
     }
 
     // ---------- 5. 查询是否已收藏 ----------
-    let isCollected = false;
-    if (user) {
-      const { data: collectRow } = await supabase
-        .from('collect')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('post_id', id)
-        .maybeSingle();
-      isCollected = !!collectRow;
-    }
+  let isCollected = false;
+  if (user) {
+    const { data: collectRow } = await supabase
+      .from('collect')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('post_id', id)
+      .maybeSingle();
+    isCollected = !!collectRow;
+  }
 
-    // ---------- 6. 组装返回 ----------
+  // ---------- 6. 组装返回 ----------
     const author = (post as any).author?.[0] ?? (post as any).author ?? {};
     const detail: PostDetail = {
       id: post.id,
@@ -111,6 +134,8 @@ export async function GET(request: Request) {
       is_collected: isCollected,
       is_author: isAuthor,
       masked_pan_url: canViewLink ? undefined : maskPanUrl(post.pan_url),
+      points_cost: Number((post as any).points_cost ?? 0),
+      is_unlocked: isUnlocked,
     };
 
     return NextResponse.json(successResponse(detail, '查询成功'), {

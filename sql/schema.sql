@@ -147,9 +147,13 @@ create trigger on_auth_user_created
 -- ============================================================================
 -- 触发器 2：posts.comment_count 自动维护
 -- ============================================================================
+-- 关键：必须 SECURITY DEFINER，否则评论者不是帖子作者时
+-- RLS 会阻止 UPDATE posts.comment_count，导致计数不同步
 create or replace function public.update_comment_count()
 returns trigger
 language plpgsql
+security definer
+set search_path = public
 as $$
 begin
     if (tg_op = 'INSERT') then
@@ -184,6 +188,8 @@ create trigger trg_comments_count
 create or replace function public.update_post_count()
 returns trigger
 language plpgsql
+security definer
+set search_path = public
 as $$
 begin
     if (tg_op = 'INSERT') then
@@ -234,13 +240,27 @@ alter table public.report enable row level security;
 alter table public.collect enable row level security;
 alter table public.vip_log enable row level security;
 
+-- ---------- 前置：创建 is_admin() 安全定义函数 ----------
+-- 关键：使用 security definer 绕过 RLS，避免策略内查询 user_profile 导致无限递归
+-- 所有需要检查管理员身份的策略均调用此函数，而非子查询 user_profile
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select coalesce((select is_admin from public.user_profile where id = auth.uid()), false);
+$$;
+
+grant execute on function public.is_admin() to authenticated, anon;
+
 -- ---- user_profile 策略 ----
 -- 读取：本人或管理员可读（公开字段通过 API 中转脱敏，不直接暴露）
 drop policy if exists "profile_read_self_or_admin" on public.user_profile;
 create policy "profile_read_self_or_admin" on public.user_profile
     for select using (
         auth.uid() = id
-        or exists (select 1 from public.user_profile p where p.id = auth.uid() and p.is_admin = true)
+        or public.is_admin()
     );
 -- 修改：仅本人可改自己资料
 drop policy if exists "profile_update_self" on public.user_profile;
@@ -254,7 +274,7 @@ create policy "posts_read_normal" on public.posts
     for select using (
         status = 'normal'
         or author_id = auth.uid()
-        or exists (select 1 from public.user_profile p where p.id = auth.uid() and p.is_admin = true)
+        or public.is_admin()
     );
 -- 插入：登录用户只能为自己发帖
 drop policy if exists "posts_insert_auth" on public.posts;
@@ -265,14 +285,14 @@ drop policy if exists "posts_update_owner_admin" on public.posts;
 create policy "posts_update_owner_admin" on public.posts
     for update using (
         author_id = auth.uid()
-        or exists (select 1 from public.user_profile p where p.id = auth.uid() and p.is_admin = true)
+        or public.is_admin()
     );
 -- 删除：作者或管理员
 drop policy if exists "posts_delete_owner_admin" on public.posts;
 create policy "posts_delete_owner_admin" on public.posts
     for delete using (
         author_id = auth.uid()
-        or exists (select 1 from public.user_profile p where p.id = auth.uid() and p.is_admin = true)
+        or public.is_admin()
     );
 
 -- ---- comments 策略 ----
@@ -289,7 +309,7 @@ drop policy if exists "comments_delete_owner_admin" on public.comments;
 create policy "comments_delete_owner_admin" on public.comments
     for delete using (
         user_id = auth.uid()
-        or exists (select 1 from public.user_profile p where p.id = auth.uid() and p.is_admin = true)
+        or public.is_admin()
     );
 
 -- ---- report 策略 ----
@@ -298,7 +318,7 @@ drop policy if exists "report_read_self_admin" on public.report;
 create policy "report_read_self_admin" on public.report
     for select using (
         reporter_id = auth.uid()
-        or exists (select 1 from public.user_profile p where p.id = auth.uid() and p.is_admin = true)
+        or public.is_admin()
     );
 -- 插入：登录用户只能为自己提交举报
 drop policy if exists "report_insert_auth" on public.report;
@@ -307,9 +327,7 @@ create policy "report_insert_auth" on public.report
 -- 修改：仅管理员
 drop policy if exists "report_update_admin" on public.report;
 create policy "report_update_admin" on public.report
-    for update using (
-        exists (select 1 from public.user_profile p where p.id = auth.uid() and p.is_admin = true)
-    );
+    for update using (public.is_admin());
 
 -- ---- collect 策略 ----
 -- 仅本人可读写自己的收藏
@@ -324,13 +342,13 @@ create policy "vip_log_read" on public.vip_log
     for select using (
         user_id = auth.uid()
         or operator_id = auth.uid()
-        or exists (select 1 from public.user_profile p where p.id = auth.uid() and p.is_admin = true)
+        or public.is_admin()
     );
 -- 插入：仅管理员（通过 service_role 绕过 RLS，仍保留策略兜底）
 drop policy if exists "vip_log_insert_admin" on public.vip_log;
 create policy "vip_log_insert_admin" on public.vip_log
     for insert with check (
-        exists (select 1 from public.user_profile p where p.id = auth.uid() and p.is_admin = true)
+        public.is_admin()
         or operator_id = auth.uid()
     );
 

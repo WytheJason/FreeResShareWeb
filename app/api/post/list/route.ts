@@ -5,7 +5,7 @@
  * - 列表不返回完整 pan_url / pan_code（脱敏）
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import {
   successResponse,
   errorResponse,
@@ -19,6 +19,10 @@ import type { Post, PageResult, PostCategory } from '@/lib/types';
 // 合法分类白名单
 const CATEGORY_SET: PostCategory[] = ['software', 'movie'];
 
+// 禁止缓存，确保增删改后数据立即同步
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -29,7 +33,7 @@ export async function GET(request: Request) {
     const sort = searchParams.get('sort') ?? 'latest';
     const isVipParam = searchParams.get('is_vip');
 
-    const supabase = await getSupabaseServer();
+    const supabase = getSupabaseServiceAdmin();
 
     // ---------- 构建查询 ----------
     let query = supabase
@@ -108,6 +112,7 @@ export async function GET(request: Request) {
         author_avatar: author.avatar ?? '',
         created_at: item.created_at,
         updated_at: item.updated_at,
+        points_cost: item.points_cost ?? 0,
       } as Post;
     });
 

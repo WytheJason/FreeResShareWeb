@@ -98,7 +98,7 @@ export default function AdminPostsPage() {
     try {
       setActionLoading(id + 'delete');
       const res = await fetch('/api/post/delete', {
-        method: 'DELETE',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
       });

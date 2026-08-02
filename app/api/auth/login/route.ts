@@ -7,7 +7,7 @@
  * 否则 session cookie 不会被写入响应的 Set-Cookie 头。
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer, waitForAuthCookieFlush } from '@/lib/supabase-server';
+import { getSupabaseServer, getSupabaseServiceAdmin, waitForAuthCookieFlush } from '@/lib/supabase-server';
 import { successResponse, errorResponse, HTTP_STATUS, isValidEmail } from '@/lib/utils';
 
 export async function POST(request: Request) {
@@ -40,8 +40,9 @@ export async function POST(request: Request) {
       });
     }
 
-    // 查询用户 profile（含封禁状态等）
-    const { data: profile } = await supabase
+    // 查询用户 profile（含封禁状态等）—— 使用 admin 绕过 RLS 避免递归
+    const admin = getSupabaseServiceAdmin();
+    const { data: profile } = await admin
       .from('user_profile')
       .select('*')
       .eq('id', data.user.id)

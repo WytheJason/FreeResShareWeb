@@ -6,7 +6,7 @@
  * - 校验网盘链接格式
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 import {
   sanitizeUserContent,
@@ -63,10 +63,10 @@ export async function PUT(request: Request) {
       });
     }
 
-    const supabase = await getSupabaseServer();
+    const admin = getSupabaseServiceAdmin();
 
     // ---------- 2. 查询帖子并校验权限 ----------
-    const { data: post, error: queryError } = await supabase
+    const { data: post, error: queryError } = await admin
       .from('posts')
       .select('id, author_id, pan_type')
       .eq('id', id)
@@ -191,7 +191,7 @@ export async function PUT(request: Request) {
     }
 
     // ---------- 4. 执行更新 ----------
-    const { error: updateError } = await supabase
+    const { error: updateError } = await admin
       .from('posts')
       .update(updateData)
       .eq('id', id);

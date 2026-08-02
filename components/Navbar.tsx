@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Menu,
   X,
@@ -10,6 +10,7 @@ import {
   LogOut,
   Sparkles,
   ChevronDown,
+  Coins,
 } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import type { UserProfile } from '@/lib/types';
@@ -49,6 +50,12 @@ function mapUser(u: SupabaseUser): UserProfile {
     post_count: Number(meta.post_count ?? 0),
     comment_count: Number(meta.comment_count ?? 0),
     created_at: (meta.created_at as string) ?? '',
+    // 积分相关字段（user_metadata 通常不含，Navbar 通过 /api/auth/profile 单独拉取最新值）
+    points: Number(meta.points ?? 0),
+    total_earned_points: Number(meta.total_earned_points ?? 0),
+    invite_code: (meta.invite_code as string) ?? null,
+    invited_by: (meta.invited_by as string) ?? null,
+    invite_count: Number(meta.invite_count ?? 0),
   };
 }
 
@@ -58,10 +65,26 @@ function mapUser(u: SupabaseUser): UserProfile {
  */
 export default function Navbar() {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  // 当前用户积分余额（独立于 user_metadata，需通过 API 拉取）
+  const [points, setPoints] = useState<number | null>(null);
+
+  // 登录成功后从服务端拉取最新积分余额（user_metadata 不含积分字段）
+  async function fetchPoints() {
+    try {
+      const res = await fetch('/api/auth/profile', { credentials: 'same-origin' });
+      const json = await res.json();
+      if (json.code === 0 && json.data) {
+        setPoints(Number(json.data.points ?? 0));
+      }
+    } catch {
+      // 静默失败，不打扰用户
+    }
+  }
 
   useEffect(() => {
     const supabase = getSupabaseBrowser();
@@ -70,6 +93,8 @@ export default function Navbar() {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) {
         setUser(mapUser(data.session.user));
+        // 拉取最新积分余额
+        fetchPoints();
       }
       setLoading(false);
     });
@@ -78,8 +103,11 @@ export default function Navbar() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(mapUser(session.user));
+        // 登录/会话恢复时刷新积分
+        fetchPoints();
       } else {
         setUser(null);
+        setPoints(null);
       }
     });
 
@@ -87,6 +115,12 @@ export default function Navbar() {
       listener.subscription.unsubscribe();
     };
   }, []);
+
+  // 路由变化时刷新积分余额（发帖/解锁/被邀请后能即时反映）
+  useEffect(() => {
+    if (!user) return;
+    fetchPoints();
+  }, [pathname, user]);
 
   // 退出登录
   async function handleLogout() {
@@ -149,9 +183,16 @@ export default function Navbar() {
                     <User size={16} />
                   </div>
                 )}
-                <span className="max-w-[8rem] truncate text-sm text-text-primary">
+                <span className="max-w-[6rem] truncate text-sm text-text-primary">
                   {user.nickname || user.email}
                 </span>
+                {/* 积分徽章 */}
+                {points !== null && (
+                  <span className="flex items-center gap-0.5 rounded-full bg-purple-500/15 px-2 py-0.5 text-xs text-purple-300">
+                    <Coins size={10} />
+                    {points}
+                  </span>
+                )}
                 <ChevronDown className="text-text-muted" size={14} />
               </button>
 
@@ -162,7 +203,25 @@ export default function Navbar() {
                     className="fixed inset-0 z-10"
                     onClick={() => setUserMenuOpen(false)}
                   />
-                  <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-lg border border-border bg-bg-elevated shadow-xl">
+                  <div className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-lg border border-border bg-bg-elevated shadow-xl">
+                    {/* 积分概览（顶部） */}
+                    {points !== null && (
+                      <div className="flex items-center justify-between border-b border-border bg-purple-500/5 px-3 py-2.5">
+                        <span className="flex items-center gap-1 text-xs text-text-muted">
+                          <Coins size={12} className="text-purple-300" />
+                          我的积分
+                        </span>
+                        <span className="text-sm font-bold text-purple-300">{points}</span>
+                      </div>
+                    )}
+                    <Link
+                      href={`/user/${user.id}?tab=points`}
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-hover"
+                    >
+                      <Coins size={14} />
+                      积分中心
+                    </Link>
                     <Link
                       href={`/user/${user.id}`}
                       onClick={() => setUserMenuOpen(false)}
@@ -220,6 +279,23 @@ export default function Navbar() {
               </Link>
             ) : (
               <>
+                {points !== null && (
+                  <div className="flex items-center justify-between rounded-lg bg-purple-500/10 px-3 py-2 text-sm">
+                    <span className="flex items-center gap-1 text-text-muted">
+                      <Coins size={14} className="text-purple-300" />
+                      我的积分
+                    </span>
+                    <span className="font-bold text-purple-300">{points}</span>
+                  </div>
+                )}
+                <Link
+                  href={`/user/${user.id}?tab=points`}
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-hover"
+                >
+                  <Coins size={14} />
+                  积分中心
+                </Link>
                 <Link
                   href={`/user/${user.id}`}
                   onClick={() => setMenuOpen(false)}

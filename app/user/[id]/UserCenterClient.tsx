@@ -3,10 +3,10 @@
 /**
  * 个人中心客户端组件（完整版）
  * - 顶部资料卡：头像/昵称/VIP/邮箱/简介/注册时间/复制ID/编辑资料
- * - 数据总览：发帖、评论、收藏、浏览 4 项数据卡片
+ * - 数据总览：发帖、评论、收藏、浏览、积分、邀请 6 项数据卡片
  * - 用户等级：根据发帖+评论计算等级，展示进度条
- * - 快捷入口：发布资源、VIP 专区、返回首页、复制分享链接
- * - Tab 切换（URL searchParams 驱动）：我的帖子、我的评论、收藏夹、浏览记录
+ * - 快捷入口：发布资源、VIP 专区、返回首页、复制分享链接、邀请好友
+ * - Tab 切换（URL searchParams 驱动）：我的帖子、我的评论、收藏夹、浏览记录、积分
  * - 两个对话框：编辑资料（Turnstile 校验）、修改密码
  */
 
@@ -35,6 +35,8 @@ import {
   User as UserIcon,
   AlertTriangle,
   EyeOff,
+  Coins,
+  UserPlus,
 } from 'lucide-react';
 import type { Post, UserProfile, PageResult } from '@/lib/types';
 import { formatRegisterDuration, formatRelativeTime } from '@/lib/utils';
@@ -43,9 +45,10 @@ import Pagination from '@/components/Pagination';
 import Empty from '@/components/Empty';
 import VipBadge from '@/components/VipBadge';
 import TurnstileWidget, { type TurnstileWidgetHandle } from '@/components/TurnstileWidget';
+import PointsPanel from './PointsPanel';
 import { useToast } from '@/components/Toast';
 
-export type TabKey = 'posts' | 'comments' | 'collects' | 'history';
+export type TabKey = 'posts' | 'comments' | 'collects' | 'history' | 'points';
 
 export interface UserCommentItem {
   id: string;
@@ -60,6 +63,10 @@ export interface UserStats {
   comment_count: number;
   collect_count: number;
   view_count: number;
+  /** 当前积分余额 */
+  points: number;
+  /** 成功邀请人数 */
+  invite_count: number;
 }
 
 interface UserCenterClientProps {
@@ -77,6 +84,7 @@ const TABS: { key: TabKey; label: string; icon: typeof FileText; ownerOnly?: boo
   { key: 'comments', label: '我的评论', icon: MessageSquare },
   { key: 'collects', label: '收藏夹', icon: Heart, ownerOnly: true },
   { key: 'history', label: '浏览记录', icon: Eye, ownerOnly: true },
+  { key: 'points', label: '积分', icon: Coins },
 ];
 
 // ============ 等级系统 ============
@@ -139,6 +147,9 @@ export default function UserCenterClient({
 
   // ========== 复制 ID ==========
   const [copiedId, setCopiedId] = useState(false);
+
+  // ========== 复制邀请码 ==========
+  const [copiedInvite, setCopiedInvite] = useState(false);
 
   // ========== VIP 剩余天数 ==========
   const vipDays = useMemo(() => {
@@ -296,6 +307,22 @@ export default function UserCenterClient({
     }
   }
 
+  // ========== 复制邀请码 ==========
+  async function handleCopyInviteCode() {
+    if (!profile.invite_code) {
+      toast.show('error', '暂无邀请码');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(profile.invite_code);
+      setCopiedInvite(true);
+      setTimeout(() => setCopiedInvite(false), 2000);
+      toast.show('success', '邀请码已复制');
+    } catch {
+      toast.show('error', '复制失败');
+    }
+  }
+
   // ========== 复制分享链接 ==========
   async function handleCopyLink() {
     try {
@@ -357,6 +384,11 @@ export default function UserCenterClient({
               {profile.is_vip && vipDays > 0 && (
                 <span className="text-xs text-gold-300 bg-gold-500/10 rounded px-2 py-0.5">
                   VIP 剩 {vipDays} 天
+                </span>
+              )}
+              {profile.points > 0 && (
+                <span className="text-xs text-purple-300 bg-purple-500/10 rounded px-2 py-0.5">
+                  {profile.points} 积分
                 </span>
               )}
               <span
@@ -479,6 +511,18 @@ export default function UserCenterClient({
             color: 'from-purple-500/20 to-purple-600/10 text-purple-400',
             locked: !isOwner,
           },
+          {
+            label: '积分余额',
+            value: userStats.points,
+            icon: Coins,
+            color: 'from-purple-500/20 to-purple-600/10 text-purple-400',
+          },
+          {
+            label: '邀请人数',
+            value: userStats.invite_count,
+            icon: UserPlus,
+            color: 'from-blue-500/20 to-blue-600/10 text-blue-400',
+          },
         ].map((item) => (
           <div
             key={item.label}
@@ -559,6 +603,28 @@ export default function UserCenterClient({
               </div>
             </div>
           </button>
+
+          {/* 邀请好友 */}
+          <div className="card p-4 hover:bg-bg-hover transition-colors group">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-lg bg-blue-500/20 text-blue-400 group-hover:bg-blue-500/30 transition-colors">
+                <UserPlus size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-text-primary">邀请好友</p>
+                <p className="text-[10px] text-text-dim truncate">
+                  邀请码：{profile.invite_code || '—'}
+                </p>
+              </div>
+              <button
+                onClick={handleCopyInviteCode}
+                className="text-text-dim hover:text-primary-400 transition-colors shrink-0"
+                title="复制邀请码"
+              >
+                {copiedInvite ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -591,6 +657,8 @@ export default function UserCenterClient({
           <Shield size={32} className="mx-auto mb-3 text-text-dim opacity-50" />
           <p className="text-text-muted">这是用户的隐私数据，仅本人可查看</p>
         </div>
+      ) : activeTab === 'points' ? (
+        <PointsPanel profile={profile} isOwner={isOwner} />
       ) : activeTab === 'comments' ? (
         <div className="space-y-3">
           {(pageData.list as UserCommentItem[]).length > 0 ? (

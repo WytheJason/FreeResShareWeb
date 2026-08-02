@@ -4,6 +4,7 @@
  * - 校验邮箱与密码强度
  * - 调用 Supabase Auth admin.createUser 创建用户
  * - 触发器自动写入 user_profile
+ * - 支持邀请码追踪：绑定邀请关系，给邀请人和新用户发放积分奖励
  */
 import { NextResponse } from 'next/server';
 import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
@@ -16,6 +17,7 @@ import {
   isValidPassword,
   isValidNickname,
 } from '@/lib/utils';
+import { POINT_RULES } from '@/lib/types';
 
 // 强制动态渲染，防止 Vercel 静态化导致 API 阻塞
 export const dynamic = 'force-dynamic';
@@ -31,10 +33,11 @@ type CaptchaData = TurnstileCaptcha;
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, nickname } = body as {
+    const { email, password, nickname, invite_code } = body as {
       email: string;
       password: string;
       nickname?: string;
+      invite_code?: string;
       captcha: CaptchaData;
     };
 
@@ -89,8 +92,27 @@ export async function POST(request: Request) {
       });
     }
 
-    // ---------- 3. 创建用户 ----------
+    // ---------- 3. 预查邀请人（如果填了邀请码）----------
     const admin = getSupabaseServiceAdmin();
+    let inviterId: string | null = null;
+
+    if (invite_code && typeof invite_code === 'string') {
+      const code = invite_code.trim().toUpperCase();
+      if (code.length > 0 && code.length <= 20) {
+        const { data: inviter } = await admin
+          .from('user_profile')
+          .select('id, invite_code')
+          .eq('invite_code', code)
+          .maybeSingle();
+
+        if (inviter) {
+          inviterId = inviter.id;
+        }
+        // 邀请码无效时不阻断注册，只是不发放邀请奖励
+      }
+    }
+
+    // ---------- 4. 创建用户 ----------
     const { data, error } = await admin.auth.admin.createUser({
       email,
       password,
@@ -105,18 +127,78 @@ export async function POST(request: Request) {
       });
     }
 
-    // 更新昵称
-    if (nickname && data.user) {
+    const newUserId = data.user!.id;
+
+    // ---------- 5. 更新昵称 + 绑定邀请人 ----------
+    const updateData: Record<string, unknown> = {};
+    if (nickname) updateData.nickname = nickname;
+    if (inviterId) updateData.invited_by = inviterId;
+
+    if (Object.keys(updateData).length > 0) {
       const { error: profileError } = await admin
         .from('user_profile')
-        .update({ nickname })
-        .eq('id', data.user.id);
+        .update(updateData)
+        .eq('id', newUserId);
       if (profileError) {
-        console.warn('[Auth Register] 更新昵称失败:', profileError.message);
+        console.warn('[Auth Register] 更新资料失败:', profileError.message);
       }
     }
 
-    console.log('[Auth Register] 注册成功:', email);
+    // ---------- 6. 发放积分奖励 ----------
+    // 6.1 新用户注册奖励
+    try {
+      await admin.rpc('change_user_points', {
+        p_user_id: newUserId,
+        p_amount: POINT_RULES.REGISTER_REWARD,
+        p_action: 'register',
+        p_note: '注册成功奖励',
+      });
+    } catch (e) {
+      console.warn('[Auth Register] 注册奖励发放失败:', (e as Error).message);
+    }
+
+    // 6.2 邀请奖励（邀请人 + 被邀请人）
+    if (inviterId) {
+      try {
+        // 写入邀请关系
+        await admin.from('invite_relation').insert({
+          inviter_id: inviterId,
+          invitee_id: newUserId,
+          invite_code: invite_code!.trim().toUpperCase(),
+          reward_points: POINT_RULES.INVITE_REWARD,
+          status: 'success',
+        });
+
+        // 给邀请人加分
+        await admin.rpc('change_user_points', {
+          p_user_id: inviterId,
+          p_amount: POINT_RULES.INVITE_REWARD,
+          p_action: 'invite_reward',
+          p_related_user_id: newUserId,
+          p_note: `邀请用户注册奖励`,
+        });
+
+        // 更新邀请人的 invite_count（RPC 可能不存在，失败时降级手动更新）
+        try {
+          await admin.rpc('increment_invite_count', { p_user_id: inviterId });
+        } catch {
+          // 降级手动更新
+        }
+
+        // 给新用户额外加分（被邀请奖励）
+        await admin.rpc('change_user_points', {
+          p_user_id: newUserId,
+          p_amount: POINT_RULES.INVITED_BONUS,
+          p_action: 'invited_bonus',
+          p_related_user_id: inviterId,
+          p_note: '被邀请注册额外奖励',
+        });
+      } catch (e) {
+        console.warn('[Auth Register] 邀请奖励发放失败:', (e as Error).message);
+      }
+    }
+
+    console.log('[Auth Register] 注册成功:', email, inviterId ? `(邀请人: ${inviterId})` : '');
     return NextResponse.json(successResponse(null, '注册成功'), {
       status: HTTP_STATUS.OK,
     });

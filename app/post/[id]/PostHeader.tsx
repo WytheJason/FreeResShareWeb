@@ -3,7 +3,7 @@
  * 纯展示组件，由 PostDetailClient 调用
  */
 
-import { Eye, MessageCircle, Pin, Crown } from 'lucide-react';
+import { Eye, MessageCircle, Pin, Crown, Coins } from 'lucide-react';
 import type { PostDetail } from '@/lib/types';
 import { CATEGORY_LABELS } from '@/lib/types';
 import { formatDateTime, formatRelativeTime } from '@/lib/utils';
@@ -50,6 +50,11 @@ export default function PostHeader({ post }: PostHeaderProps) {
           {post.is_vip && (
             <span className="tag tag-vip">
               <Crown size={10} /> VIP
+            </span>
+          )}
+          {post.points_cost > 0 && (
+            <span className="tag bg-purple-500/20 text-purple-300">
+              <Coins size={10} /> {post.points_cost}积分
             </span>
           )}
           <span className="flex items-center gap-1">

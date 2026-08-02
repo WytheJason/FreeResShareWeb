@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, User, Eye, EyeOff, Sparkles, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Sparkles, ArrowLeft, Gift } from 'lucide-react';
 import { getSupabaseBrowser } from '@/lib/supabase';
 import {
   isValidEmail,
@@ -46,18 +46,23 @@ export default function LoginPage() {
   const [regPwd, setRegPwd] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
   const [regNick, setRegNick] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
 
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
-  // 读取 redirect 参数 + 检查登录态
+  // 读取 redirect 参数 + 邀请码 + 检查登录态
   useEffect(() => {
-    // 从 URL 读取 redirect 参数（避免使用 useSearchParams 触发 Suspense 要求）
+    // 从 URL 读取 redirect 和 invite 参数
     try {
       const params = new URLSearchParams(window.location.search);
       const r = params.get('redirect');
       if (r && r.startsWith('/')) {
         setRedirect(r);
+      }
+      const invite = params.get('invite');
+      if (invite) {
+        setInviteCode(invite.toUpperCase());
       }
     } catch {
       // ignore
@@ -150,6 +155,7 @@ export default function LoginPage() {
           email: regEmail,
           password: regPwd,
           nickname: regNick.trim() || undefined,
+          invite_code: inviteCode.trim() || undefined,
           captcha: { type: 'turnstile', token },
         }),
       });
@@ -163,6 +169,7 @@ export default function LoginPage() {
         setRegPwd('');
         setRegConfirm('');
         setRegNick('');
+        setInviteCode('');
         turnstileRef.current?.reset();
         setTab('login');
       } else {
@@ -389,6 +396,28 @@ export default function LoginPage() {
                   onChange={(e) => setRegNick(e.target.value)}
                   placeholder="给自己起个名字"
                   className="input-field pl-9"
+                  maxLength={20}
+                />
+              </div>
+            </div>
+
+            {/* 邀请码（可选） */}
+            <div>
+              <label className="mb-1 block text-xs text-text-muted">
+                邀请码（可选）
+                <span className="ml-1 text-text-dim">填写可获额外积分</span>
+              </label>
+              <div className="relative">
+                <Gift
+                  size={14}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-dim"
+                />
+                <input
+                  type="text"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                  placeholder="好友的邀请码"
+                  className="input-field pl-9 uppercase tracking-wider"
                   maxLength={20}
                 />
               </div>

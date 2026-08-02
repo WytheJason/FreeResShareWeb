@@ -6,8 +6,12 @@
  * - 查询第一页评论（嵌套结构）
  */
 
+// 禁止缓存，确保增删改后数据立即同步
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { notFound } from 'next/navigation';
-import { getSupabaseServer, getSupabaseServiceAdmin } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import {
   getCurrentUser,
   canViewPublicResource,
@@ -45,6 +49,7 @@ interface PostRaw {
   author_id: string;
   created_at: string;
   updated_at: string;
+  points_cost: number;
   author: unknown;
 }
 
@@ -88,16 +93,14 @@ export default async function PostDetailPage({
 }: {
   params: { id: string };
 }) {
-  // 使用 admin 绕过 RLS 查询帖子详情（公开数据）
-  // 使用 supabase（绑定会话）查询收藏等私有数据
+  // 使用 admin 绕过 RLS 查询帖子详情和收藏状态（公开数据 + 私有数据均通过 admin 查询）
   const admin = getSupabaseServiceAdmin();
-  const supabase = await getSupabaseServer().catch(() => null);
 
   // ---------- 1. 查询帖子 ----------
   const { data: rawData, error } = await admin
     .from('posts')
     .select(
-      'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, author:user_profile!posts_author_id_fkey(nickname, avatar)'
+      'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, points_cost, author:user_profile!posts_author_id_fkey(nickname, avatar)'
     )
     .eq('id', params.id)
     .single();
@@ -123,7 +126,30 @@ export default async function PostDetailPage({
   const isAuthor = !!currentUser && currentUser.id === raw.author_id;
   let canViewLink = false;
   let canViewCode = false;
-  if (raw.is_vip) {
+  let isUnlocked = false;
+
+  // 积分资源（points_cost > 0）：需要积分解锁后才能查看
+  // VIP 资源（is_vip=true）：VIP 会员或作者可查看
+  // 普通资源：登录用户可查看
+  if (raw.points_cost > 0) {
+    // 作者无需解锁
+    if (isAuthor) {
+      canViewLink = true;
+      canViewCode = true;
+      isUnlocked = true;
+    } else if (currentUser) {
+      // 检查是否已解锁
+      const { data: unlockRow } = await admin
+        .from('post_unlock')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .eq('post_id', params.id)
+        .maybeSingle();
+      isUnlocked = !!unlockRow;
+      canViewLink = isUnlocked;
+      canViewCode = isUnlocked;
+    }
+  } else if (raw.is_vip) {
     canViewLink = canViewVipResource(currentUser, raw.author_id);
     canViewCode = canViewVipResource(currentUser, raw.author_id);
   } else {
@@ -133,8 +159,8 @@ export default async function PostDetailPage({
 
   // ---------- 4. 是否已收藏 ----------
   let isCollected = false;
-  if (currentUser && supabase) {
-    const { data: collectRow } = await supabase
+  if (currentUser) {
+    const { data: collectRow } = await admin
       .from('collect')
       .select('id')
       .eq('user_id', currentUser.id)
@@ -165,10 +191,12 @@ export default async function PostDetailPage({
     author_avatar: author?.avatar ?? '',
     created_at: raw.created_at,
     updated_at: raw.updated_at,
+    points_cost: raw.points_cost ?? 0,
     can_view_link: canViewLink,
     can_view_code: canViewCode,
     is_collected: isCollected,
     is_author: isAuthor,
+    is_unlocked: isUnlocked,
     masked_pan_url: canViewLink ? undefined : maskPanUrl(raw.pan_url),
   };
 

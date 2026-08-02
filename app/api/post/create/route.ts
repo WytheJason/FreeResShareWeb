@@ -5,7 +5,7 @@
  * - 入库 posts 表
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer, getSupabaseServiceAdmin } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser, canPublish } from '@/lib/auth';
 import { verifyTurnstileToken, getTurnstileSecretKey } from '@/lib/turnstile';
 import {
@@ -23,6 +23,7 @@ import {
   isValidPanCode,
 } from '@/lib/utils';
 import type { PostForm, PostCategory, PanType, CaptchaTicket } from '@/lib/types';
+import { POINT_RULES } from '@/lib/types';
 
 // 允许的分类与网盘类型白名单
 const CATEGORY_WHITELIST: PostCategory[] = ['software', 'movie'];
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
       pan_url,
       pan_code,
       is_vip,
+      points_cost,
       captcha,
     } = body as PostForm & { captcha: CaptchaTicket };
 
@@ -127,6 +129,9 @@ export async function POST(request: Request) {
       // 使用 service_role 绕过 RLS，确保 insert 不被 RLS 阻止
       // 用户身份已通过 getCurrentUser() 验证，author_id 手动设置为当前用户
       const admin = getSupabaseServiceAdmin();
+      // 积分费用校验：范围 0-100，非数字或负数默认 0
+      const safePointsCost = Math.max(0, Math.min(100, Number(points_cost) || 0));
+
       const { data, error } = await admin
         .from('posts')
         .insert({
@@ -138,6 +143,7 @@ export async function POST(request: Request) {
           pan_url: pan_url.trim(),
           pan_code: (pan_code ?? '').trim(),
           is_vip: !!is_vip,
+          points_cost: safePointsCost,
           author_id: user.id,
           status: 'normal',
         })
@@ -150,25 +156,20 @@ export async function POST(request: Request) {
         });
       }
 
-      // 同步更新 user_profile 的 post_count（service_role 绕过 RLS）
+      // ---------- 7. 发帖奖励积分 ----------
       try {
-        await admin.rpc('increment_post_count', { user_id: user.id });
-      } catch {
-        // RPC 可能不存在，降级为手动更新
-        try {
-          const { data: profile } = await admin
-            .from('user_profile')
-            .select('post_count')
-            .eq('id', user.id)
-            .single();
-          await admin
-            .from('user_profile')
-            .update({ post_count: (profile?.post_count ?? 0) + 1 })
-            .eq('id', user.id);
-        } catch {
-          // post_count 同步失败不影响发布，忽略
-        }
+        await admin.rpc('change_user_points', {
+          p_user_id: user.id,
+          p_amount: POINT_RULES.POST_REWARD,
+          p_action: 'post_reward',
+          p_post_id: data.id,
+          p_note: `发帖奖励: ${safeTitle.slice(0, 20)}`,
+        });
+      } catch (e) {
+        console.warn('[Post Create] 发帖奖励发放失败:', (e as Error).message);
       }
+
+      // post_count 由数据库触发器 trg_posts_count 自动维护，无需手动更新
 
       return NextResponse.json(
         successResponse({ id: data.id }, '发布成功'),

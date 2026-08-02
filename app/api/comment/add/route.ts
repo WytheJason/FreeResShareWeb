@@ -6,7 +6,7 @@
  * - 返回新建评论（含 user_nickname/user_avatar）
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser, canPublish } from '@/lib/auth';
 import { verifyTurnstileToken, getTurnstileSecretKey } from '@/lib/turnstile';
 import {
@@ -87,10 +87,10 @@ export async function POST(request: Request) {
 
       const safeContent = sanitizeUserContent(content);
 
-      const supabase = await getSupabaseServer();
+      const admin = getSupabaseServiceAdmin();
 
       // ---------- 5. 校验帖子存在 ----------
-      const { data: post } = await supabase
+      const { data: post } = await admin
         .from('posts')
         .select('id')
         .eq('id', post_id)
@@ -104,13 +104,13 @@ export async function POST(request: Request) {
       // ---------- 6. 处理 reply_to_nickname ----------
       let replyToNickname: string | null = null;
       if (reply_to_id) {
-        const { data: replyTo } = await supabase
+        const { data: replyTo } = await admin
           .from('comments')
           .select('user_id')
           .eq('id', reply_to_id)
           .maybeSingle();
         if (replyTo?.user_id) {
-          const { data: replyUser } = await supabase
+          const { data: replyUser } = await admin
             .from('user_profile')
             .select('nickname')
             .eq('id', replyTo.user_id)
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
       }
 
       // ---------- 7. 入库 ----------
-      const { data: newComment, error } = await supabase
+      const { data: newComment, error } = await admin
         .from('comments')
         .insert({
           post_id,

@@ -197,3 +197,17 @@ begin
   return true;
 end;
 $$;
+
+-- ---------- 10. 邀请人数自增函数 ----------
+create or replace function public.increment_invite_count(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+as $$
+begin
+  update public.user_profile
+  set invite_count = invite_count + 1
+  where id = p_user_id;
+end;
+$$;
+

@@ -4,7 +4,7 @@
  * - PUT 编辑本人资料（Turnstile 校验）
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser } from '@/lib/auth';
 import { verifyTurnstileToken, getTurnstileSecretKey } from '@/lib/turnstile';
 import { sanitizeUserContent } from '@/lib/security';
@@ -15,6 +15,10 @@ import {
   isValidNickname,
 } from '@/lib/utils';
 import type { CaptchaTicket } from '@/lib/types';
+
+// 禁止缓存，确保增删改后数据立即同步
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // ============ 获取当前用户资料 ============
 export async function GET() {
@@ -87,9 +91,9 @@ export async function PUT(request: Request) {
     const safeBio = sanitizeUserContent(bio ?? '');
     const safeAvatar = (avatar ?? '').trim();
 
-    // ---------- 5. 仅本人可改（RLS 也会兜底）----------
-    const supabase = await getSupabaseServer();
-    const { error } = await supabase
+    // ---------- 5. 仅本人可改（使用 admin 绕过 RLS）----------
+    const admin = getSupabaseServiceAdmin();
+    const { error } = await admin
       .from('user_profile')
       .update({
         nickname,

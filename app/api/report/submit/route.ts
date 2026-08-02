@@ -6,7 +6,7 @@
  * - 同一用户对同一帖子的 pending 举报只允许一个
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser } from '@/lib/auth';
 import {
   sanitizeUserContent,
@@ -53,10 +53,10 @@ export async function POST(request: Request) {
 
       const safeReason = sanitizeUserContent(reasonTrim);
 
-      const supabase = await getSupabaseServer();
+      const admin = getSupabaseServiceAdmin();
 
       // ---------- 4. 检查帖子存在 ----------
-      const { data: post } = await supabase
+      const { data: post } = await admin
         .from('posts')
         .select('id')
         .eq('id', post_id)
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       }
 
       // ---------- 5. 同一用户对同一帖子 pending 举报唯一 ----------
-      const { data: existing } = await supabase
+      const { data: existing } = await admin
         .from('report')
         .select('id')
         .eq('post_id', post_id)
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       }
 
       // ---------- 6. 写入举报 ----------
-      const { error } = await supabase.from('report').insert({
+      const { error } = await admin.from('report').insert({
         post_id,
         reporter_id: user.id,
         reason: safeReason,

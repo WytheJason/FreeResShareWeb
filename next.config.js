@@ -11,6 +11,16 @@
 const nextConfig = {
   reactStrictMode: false,
 
+  // 禁用 Router Cache（客户端 RSC payload 缓存）
+  // 默认动态路由缓存 5 分钟，导致发布/删除资源后回到首页仍显示旧数据
+  // 设为 0 后每次客户端导航都会重新请求服务端渲染
+  experimental: {
+    staleTimes: {
+      dynamic: 0,
+      static: 0,
+    },
+  },
+
   async headers() {
     return [
       {
