@@ -6,7 +6,7 @@
  * - 不触发邮箱重新验证（用户已登录）
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServer, waitForAuthCookieFlush } from '@/lib/supabase-server';
 import { getCurrentUser } from '@/lib/auth';
 import {
   successResponse,
@@ -76,6 +76,9 @@ export async function PUT(request: Request) {
         status: HTTP_STATUS.INTERNAL_ERROR,
       });
     }
+
+    // 等待 onAuthStateChange 回调完成（USER_UPDATED 事件会触发 cookie 刷新）
+    await waitForAuthCookieFlush();
 
     return NextResponse.json(successResponse(null, '密码修改成功'), {
       status: HTTP_STATUS.OK,

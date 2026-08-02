@@ -2,9 +2,12 @@
  * 登录接口
  * - 调用 Supabase Auth signInWithPassword
  * - 返回用户基本信息
+ *
+ * 重要：signInWithPassword 后必须等待 onAuthStateChange 回调完成，
+ * 否则 session cookie 不会被写入响应的 Set-Cookie 头。
  */
 import { NextResponse } from 'next/server';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServer, waitForAuthCookieFlush } from '@/lib/supabase-server';
 import { successResponse, errorResponse, HTTP_STATUS, isValidEmail } from '@/lib/utils';
 
 export async function POST(request: Request) {
@@ -50,6 +53,12 @@ export async function POST(request: Request) {
         status: HTTP_STATUS.FORBIDDEN,
       });
     }
+
+    // 关键：等待 @supabase/ssr 的 onAuthStateChange 异步回调完成
+    // 回调内部通过 applyServerStorage → setAll → cookieStore.set() 设置 session cookie
+    // 使用 setTimeout(0) 宏任务等待所有微任务（含 getAll/setAll 的 await）执行完毕
+    // 确保 Set-Cookie 头被正确写入响应
+    await waitForAuthCookieFlush();
 
     return NextResponse.json(
       successResponse(

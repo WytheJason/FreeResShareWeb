@@ -2,6 +2,14 @@
  * Supabase 服务端客户端
  * 用于 Server Components、Route Handlers、Middleware
  * 通过 cookies 适配 SSR 会话
+ *
+ * 重要：
+ * - @supabase/ssr 的 createServerClient 通过 onAuthStateChange 异步回调设置 cookie
+ *   回调内部有 await getAll / await setAll，需要 2 个微任务才能完成
+ *   在 Route Handler（如 /api/auth/login）调用 signInWithPassword 后，
+ *   必须等待微任务队列清空，确保 cookie 已写入 cookieStore 后再返回响应
+ * - Server Component 中 setAll 的 cookieStore.set() 会抛错（只读），被 catch 静默忽略
+ *   因此必须配置 middleware 刷新 session（见 middleware.ts）
  */
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
@@ -41,13 +49,31 @@ export async function getSupabaseServer(): Promise<SupabaseClient> {
           cookiesToSet.forEach(({ name, value, options }) =>
             cookieStore.set(name, value, options)
           );
-        } catch {
+        } catch (e) {
           // 在 Server Component 中调用 set 会抛错，可忽略
-          // 仅在 Route Handler / Server Action 中生效
+          // 仅在 Route Handler / Server Action / Middleware 中生效
+          // 不静默吞掉，便于排查 cookie 设置问题
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[Supabase Server] cookie set 失败（Server Component 中正常）:', (e as Error).message);
+          }
         }
       },
     },
   });
+}
+
+/**
+ * 等待 onAuthStateChange 异步回调完成
+ *
+ * @supabase/ssr 的 createServerClient 在 signInWithPassword / signOut / token刷新 后，
+ * 通过 onAuthStateChange → applyServerStorage → setAll 异步设置 cookie。
+ * 回调内部有 2 个 await（getAll + setAll），需要 2+ 个微任务。
+ *
+ * 使用 setTimeout(0) 宏任务等待所有微任务执行完毕，
+ * 确保 cookieStore.set() 在 Route Handler 返回响应前已完成。
+ */
+export function waitForAuthCookieFlush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 /**
