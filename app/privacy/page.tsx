@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: '隐私政策',
-  description: '软件/影视网盘资源分享论坛 - 隐私政策',
+  description: '环梦网盘资源分享论坛 - 隐私政策',
 };
 
 export default function PrivacyPage() {

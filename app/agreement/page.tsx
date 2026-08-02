@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: '用户服务协议',
-  description: '软件/影视网盘资源分享论坛 - 用户服务协议',
+  description: '环梦网盘资源分享论坛 - 用户服务协议',
 };
 
 export default function AgreementPage() {
@@ -19,7 +19,7 @@ export default function AgreementPage() {
         <section className="space-y-2">
           <h2 className="text-xl font-semibold text-text-primary">一、服务说明</h2>
           <p>
-            软件/影视网盘资源分享论坛（以下简称&ldquo;本站&rdquo;）是一个网盘资源分享社区，为用户提供软件工具、影视剧集等资源的发布、浏览、评论与收藏服务。本站所有资源由用户自行上传分享，本站仅提供信息存储空间服务。
+            环梦网盘资源分享论坛（以下简称&ldquo;本站&rdquo;）是一个网盘资源分享社区，为用户提供软件工具、影视剧集、学习资料等资源的发布、浏览、评论与收藏服务。本站所有资源由用户自行上传分享，本站仅提供信息存储空间服务。
           </p>
         </section>
 

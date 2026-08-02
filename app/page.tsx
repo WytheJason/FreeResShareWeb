@@ -13,7 +13,7 @@ import Link from 'next/link';
 // 强制动态渲染，避免页面被缓存导致新发布的资源不显示
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-import { Pin, Clock, Flame, ArrowRight, Sparkles } from 'lucide-react';
+import { Pin, Clock, Flame, ArrowRight, ShieldCheck } from 'lucide-react';
 import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { maskPanUrl, maskPanCode } from '@/lib/security';
 import { calcPageRange, calcTotalPages } from '@/lib/utils';
@@ -427,7 +427,7 @@ function Hero() {
 
       <div className="relative max-w-3xl">
         <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-primary-500/30 bg-primary-500/10 px-3 py-1 text-xs text-primary-300">
-          <Sparkles size={12} />
+          <ShieldCheck size={12} />
           安全合规的网盘资源分享社区
         </div>
         <h1 className="text-3xl font-bold leading-tight text-text-primary md:text-4xl">

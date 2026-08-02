@@ -210,7 +210,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 shadow-lg shadow-primary-600/30">
             <Sparkles className="text-white" size={22} />
           </div>
-          <h1 className="text-xl font-bold text-text-primary">软件/影视网盘资源分享论坛</h1>
+          <h1 className="text-xl font-bold text-text-primary">环梦网盘资源分享论坛</h1>
           <p className="mt-1 text-xs text-text-muted">登录后即可发布资源与评论</p>
         </div>
 

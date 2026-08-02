@@ -2,7 +2,7 @@
   "name": "free-res-share-web",
   "version": "1.0.0",
   "private": true,
-  "description": "软件/影视网盘资源分享论坛 - Next.js 14 + Supabase + 极验GeeTest4",
+  "description": "环梦网盘资源分享论坛 - Next.js 14 + Supabase + Cloudflare Turnstile",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

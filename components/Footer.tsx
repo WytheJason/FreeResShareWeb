@@ -73,7 +73,7 @@ export default function Footer() {
         <div className="mt-8 border-t border-border pt-6">
           <div className="flex flex-col items-center justify-between gap-2 md:flex-row">
             <div className="text-xs text-text-dim">
-              © 2026 软件/影视网盘资源分享论坛 · {ICP_NUMBER ? ICP_NUMBER : 'ICP备案号待填写'}
+              © 2026 环梦网盘资源分享论坛 · {ICP_NUMBER ? ICP_NUMBER : 'ICP备案号待填写'}
             </div>
             <Link
               href="/disclaimer"

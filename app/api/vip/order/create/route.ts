@@ -15,7 +15,7 @@ import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser } from '@/lib/auth';
 import { successResponse, errorResponse, HTTP_STATUS } from '@/lib/utils';
 import { getVipPlan } from '@/lib/types';
-import { createPaymentUrl, generateOrderNo, isEpayConfigured, type EpayPayType } from '@/lib/epay';
+import { createPaymentUrl, generateOrderNo, isEpayConfigured, isPayTypeAvailable, type EpayPayType } from '@/lib/epay';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -56,11 +56,19 @@ export async function POST(request: Request) {
       });
     }
 
+    // 4.1 检查该支付方式是否可用（避免前端显示维护错误）
+    if (!isPayTypeAvailable(pay_type as EpayPayType)) {
+      return NextResponse.json(
+        errorResponse('当前支付方式正在维护，请更换其他支付方式', 503),
+        { status: HTTP_STATUS.SERVICE_UNAVAILABLE }
+      );
+    }
+
     // 5. 检查易支付配置
     if (!isEpayConfigured()) {
       return NextResponse.json(
         errorResponse('支付服务未配置，请联系管理员', 503),
-        { status: HTTP_STATUS.INTERNAL_ERROR }
+        { status: HTTP_STATUS.SERVICE_UNAVAILABLE }
       );
     }
 

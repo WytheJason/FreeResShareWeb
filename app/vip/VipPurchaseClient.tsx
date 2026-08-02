@@ -41,6 +41,12 @@ const PAY_METHODS: PayMethod[] = [
   { id: 'qqpay', label: 'QQ钱包', desc: '快捷支付', color: 'text-cyan-400' },
 ];
 
+interface PayTypeStatus {
+  type: 'alipay' | 'wxpay' | 'qqpay';
+  label: string;
+  available: boolean;
+}
+
 interface VipPurchaseClientProps {
   /** 是否已登录 */
   isLoggedIn: boolean;
@@ -65,6 +71,47 @@ export default function VipPurchaseClient({
   const [selectedPlan, setSelectedPlan] = useState<VipPlanId>('year');
   const [selectedPay, setSelectedPay] = useState<PayMethod['id']>('alipay');
   const [creating, setCreating] = useState(false);
+
+  // 支付方式可用性状态
+  const [payTypes, setPayTypes] = useState<PayTypeStatus[]>([]);
+  const [payConfigured, setPayConfigured] = useState(true);
+
+  // 初始化：获取可用支付方式
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/vip/pay-types', { credentials: 'same-origin' });
+        if (!res.ok || !mounted) return;
+        const data = await res.json();
+        if (data.code === 0 && data.data) {
+          setPayConfigured(data.data.configured);
+          setPayTypes(data.data.all_types);
+          // 如果当前选中的支付方式不可用，自动切换到第一个可用的
+          const available = data.data.all_types.filter((t: PayTypeStatus) => t.available);
+          if (available.length > 0 && !available.some((t: PayTypeStatus) => t.type === selectedPay)) {
+            setSelectedPay(available[0].type);
+          }
+        }
+      } catch {
+        // 忽略
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 获取指定支付方式的可用性
+  const isPayAvailable = (id: PayMethod['id']): boolean => {
+    if (payTypes.length === 0) return true; // 未加载时默认可用
+    const found = payTypes.find((t) => t.type === id);
+    return found ? found.available : true;
+  };
+
+  // 所有支付方式是否全部不可用（维护中）
+  const allPaymentsDisabled = payConfigured && payTypes.length > 0 && payTypes.every((t) => !t.available);
 
   // 支付完成后的状态轮询
   const [pendingOrderNo, setPendingOrderNo] = useState<string | null>(null);
@@ -93,7 +140,7 @@ export default function VipPurchaseClient({
             // 支付成功
             setPaymentSuccess(true);
             setCheckingStatus(false);
-            toast.show('success', 'VIP 开通成功！');
+            toast.show('success', data.data.status_message || 'VIP 开通成功！');
             // 刷新页面以更新服务端组件
             setTimeout(() => {
               router.refresh();
@@ -103,10 +150,14 @@ export default function VipPurchaseClient({
           // 仍在 pending，继续轮询
           if (data.data.status === 'pending') {
             setTimeout(() => checkOrderStatus(orderNo), 3000);
-          } else {
-            // expired 或 failed
+          } else if (data.data.status === 'expired') {
+            // 订单过期
             setCheckingStatus(false);
-            toast.show('error', '支付未完成，请重试');
+            toast.show('error', data.data.status_message || '订单已过期，请重新下单');
+          } else {
+            // failed 或其他
+            setCheckingStatus(false);
+            toast.show('error', data.data.status_message || '支付未完成，请重试');
           }
         }
       }
@@ -135,6 +186,18 @@ export default function VipPurchaseClient({
       return;
     }
 
+    // 前置校验：所有支付方式是否都不可用
+    if (allPaymentsDisabled) {
+      toast.show('error', '当前所有支付方式均在维护中，请稍后再试');
+      return;
+    }
+
+    // 前置校验：选中的支付方式是否可用
+    if (!isPayAvailable(selectedPay)) {
+      toast.show('error', '当前支付方式正在维护中，请更换其他支付方式');
+      return;
+    }
+
     setCreating(true);
     try {
       const res = await fetch('/api/vip/order/create', {
@@ -148,6 +211,17 @@ export default function VipPurchaseClient({
       });
 
       const data = await res.json();
+
+      if (res.status === 503) {
+        // 支付方式维护或服务未配置
+        toast.show('error', data.message || '支付服务暂不可用，请稍后再试');
+        return;
+      }
+
+      if (res.status === 401) {
+        router.push('/login?redirect=/vip');
+        return;
+      }
 
       if (data.code === 0 && data.data?.pay_url) {
         // 跳转到易支付页面
@@ -283,6 +357,23 @@ export default function VipPurchaseClient({
         </div>
       )}
 
+      {/* 支付系统维护提示横幅 */}
+      {allPaymentsDisabled && (
+        <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-5 py-4">
+          <ShieldCheck size={20} className="mt-0.5 text-amber-400" />
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-amber-300">
+              支付系统维护中
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-text-muted">
+              抱歉，当前所有在线支付方式正在进行系统维护，暂时无法开通 VIP。
+              <br />
+              请稍后再试，或联系管理员了解更多信息。
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* 套餐选择 */}
       <div className="card-gold overflow-hidden">
         <div className="flex items-center gap-2 border-b border-gold-500/30 bg-gold-500/10 px-6 py-4">
@@ -355,23 +446,49 @@ export default function VipPurchaseClient({
             <div className="grid grid-cols-3 gap-3">
               {PAY_METHODS.map((method) => {
                 const active = selectedPay === method.id;
+                const available = isPayAvailable(method.id);
+                const disabled = !available || !payConfigured;
                 return (
                   <button
                     key={method.id}
+                    type="button"
+                    disabled={disabled}
                     onClick={() => setSelectedPay(method.id)}
-                    className={`flex items-center justify-center gap-2 rounded-lg border-2 py-3 transition-all ${
-                      active
-                        ? 'border-primary-500 bg-primary-500/10'
-                        : 'border-border bg-bg-surface hover:border-primary-500/40'
+                    className={`relative flex items-center justify-center gap-2 rounded-lg border-2 py-3 transition-all ${
+                      disabled
+                        ? 'cursor-not-allowed border-border/50 bg-bg-elevated/30 opacity-50'
+                        : active
+                          ? 'border-primary-500 bg-primary-500/10'
+                          : 'border-border bg-bg-surface hover:border-primary-500/40'
                     }`}
+                    title={disabled ? `${method.label}正在维护中` : ''}
                   >
-                    <span className={`text-sm font-medium ${active ? method.color : 'text-text-secondary'}`}>
+                    <span
+                      className={`text-sm font-medium ${
+                        active ? method.color : 'text-text-secondary'
+                      }`}
+                    >
                       {method.label}
                     </span>
+                    {disabled && (
+                      <span className="absolute -right-1 -top-1 rounded-full bg-red-500/80 px-1.5 py-0.5 text-[9px] font-medium text-white">
+                        维护中
+                      </span>
+                    )}
                   </button>
                 );
               })}
             </div>
+            {!payConfigured && (
+              <p className="mt-2 text-xs text-amber-400">
+                ⚠️ 支付服务暂未配置，请联系管理员开通
+              </p>
+            )}
+            {payConfigured && payTypes.some((t) => !t.available) && (
+              <p className="mt-2 text-xs text-text-dim">
+                注：部分支付方式正在维护中，请选择其他方式
+              </p>
+            )}
           </div>
 
           {/* 订单摘要 + 开通按钮 */}
@@ -395,13 +512,18 @@ export default function VipPurchaseClient({
 
           <button
             onClick={handleCreateOrder}
-            disabled={creating}
-            className="btn-gold mt-4 w-full"
+            disabled={creating || allPaymentsDisabled}
+            className="btn-gold mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50"
           >
             {creating ? (
               <>
                 <Spinner />
                 正在创建订单...
+              </>
+            ) : allPaymentsDisabled ? (
+              <>
+                <ShieldCheck size={16} />
+                支付维护中
               </>
             ) : (
               <>

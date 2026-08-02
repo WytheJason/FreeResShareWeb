@@ -4,6 +4,7 @@
  *
  * 用于前端在支付完成后轮询订单状态
  * 返回订单当前状态和 VIP 开通结果
+ * 同时负责清理过期的 pending 订单（超过 30 分钟未支付自动标记 expired）
  */
 import { NextResponse } from 'next/server';
 import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
@@ -12,6 +13,9 @@ import { successResponse, errorResponse, HTTP_STATUS } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+/** 订单过期时间（毫秒）：30 分钟 */
+const ORDER_EXPIRE_MS = 30 * 60 * 1000;
 
 export async function GET(request: Request) {
   try {
@@ -32,6 +36,15 @@ export async function GET(request: Request) {
     }
 
     const admin = getSupabaseServiceAdmin();
+
+    // 先自动清理一次该用户的过期 pending 订单（防止无效订单干扰）
+    const expireBefore = new Date(Date.now() - ORDER_EXPIRE_MS).toISOString();
+    await admin
+      .from('vip_order')
+      .update({ status: 'expired' })
+      .eq('status', 'pending')
+      .eq('user_id', user.id)
+      .lt('created_at', expireBefore);
 
     // 查询订单（确保是当前用户的订单）
     const { data: order } = await admin
@@ -59,10 +72,28 @@ export async function GET(request: Request) {
       ? new Date(latestProfile.vip_expired_at).getTime() > Date.now()
       : false;
 
+    // 根据状态生成不同提示
+    let statusMessage = '';
+    switch (order.status) {
+      case 'paid':
+        statusMessage = '支付成功，VIP 已开通';
+        break;
+      case 'pending':
+        statusMessage = '等待支付完成...';
+        break;
+      case 'expired':
+        statusMessage = '订单已过期，请重新下单';
+        break;
+      case 'failed':
+        statusMessage = '支付失败，请重新下单';
+        break;
+    }
+
     return NextResponse.json(
       successResponse({
         order_no: order.order_no,
         status: order.status,
+        status_message: statusMessage,
         plan_id: order.plan_id,
         plan_name: order.plan_name,
         amount: order.amount,

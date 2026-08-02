@@ -40,6 +40,31 @@ export function isEpayConfigured(): boolean {
   return !!(process.env.EPAY_PID && process.env.EPAY_KEY && process.env.EPAY_API_URL);
 }
 
+/**
+ * 检查当前支付方式是否在易支付商户端已开通
+ * 注意：易支付本身不提供查询支付渠道状态的 API，因此本函数
+ *       通过环境变量 EPAY_DISABLED_TYPES（逗号分隔）来声明哪些支付方式被关闭
+ *       当某个支付方式被关闭时，前端应隐藏该选项并给出提示
+ *
+ * 商户后台实际渠道需要易支付管理员开通，此处提供代码层的"软关闭"机制
+ */
+export function isPayTypeAvailable(payType: EpayPayType): boolean {
+  if (!isEpayConfigured()) return false;
+  const disabled = (process.env.EPAY_DISABLED_TYPES ?? '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+  return !disabled.includes(payType);
+}
+
+/**
+ * 获取当前所有可用的支付方式列表
+ */
+export function getAvailablePayTypes(): EpayPayType[] {
+  const all: EpayPayType[] = ['alipay', 'wxpay', 'qqpay'];
+  return all.filter((t) => isPayTypeAvailable(t));
+}
+
 // ============ 签名 ============
 
 /**

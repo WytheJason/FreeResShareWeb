@@ -14,15 +14,15 @@ import { ToastProvider } from '@/components/Toast';
 // ============ SEO 元数据 ============
 export const metadata: Metadata = {
   title: {
-    default: '软件/影视网盘资源分享论坛',
-    template: '%s | 软件/影视网盘资源分享论坛',
+    default: '环梦网盘资源分享论坛',
+    template: '%s | 环梦网盘资源分享论坛',
   },
   description:
-    '软件/影视网盘资源分享论坛是专注于软件工具与影视剧集网盘资源分享的社区论坛，提供安全合规的资源发布、楼中楼评论、VIP 会员体系与多层安全防护。',
-  keywords: ['网盘资源', '软件分享', '影视资源', '资源论坛', 'VIP会员'],
-  authors: [{ name: '软件/影视网盘资源分享论坛' }],
+    '环梦网盘资源分享论坛是专注于软件工具、影视剧集、学习资料等网盘资源分享的社区论坛，提供安全合规的资源发布、楼中楼评论、VIP 会员体系与多层安全防护。',
+  keywords: ['网盘资源', '软件分享', '影视资源', '资源论坛', 'VIP会员', '学习资料'],
+  authors: [{ name: '环梦网盘资源分享论坛' }],
   openGraph: {
-    title: '软件/影视网盘资源分享论坛',
+    title: '环梦网盘资源分享论坛',
     description: '安全合规的网盘资源分享社区',
     type: 'website',
     locale: 'zh_CN',
