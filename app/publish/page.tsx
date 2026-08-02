@@ -186,15 +186,6 @@ export default function PublishPage() {
 
     setLoading(true);
     try {
-      // 提交前确认会话仍然有效，避免 access_token 过期导致 401
-      const supabase = getSupabaseBrowser();
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        toast.show('error', '登录已过期，请重新登录');
-        router.push('/login?redirect=/publish');
-        return;
-      }
-
       const token = await turnstileRef.current?.getToken();
       if (!token) {
         setLoading(false);
@@ -208,7 +199,7 @@ export default function PublishPage() {
         body: JSON.stringify({ ...form, captcha: { type: 'turnstile', token } }),
       });
 
-      // 401 表示服务端会话已失效（可能 access_token 过期且 refresh 失败）
+      // 401 表示服务端会话已失效（access_token 过期且 refresh 失败）
       if (res.status === 401) {
         toast.show('error', '登录状态已失效，请重新登录');
         turnstileRef.current?.reset();
@@ -219,7 +210,9 @@ export default function PublishPage() {
       const data = await res.json();
       if (data.code === 0 && data.data?.id) {
         toast.show('success', '发布成功');
+        // 跳转到帖子详情页，router.push 会触发页面刷新
         router.push(`/post/${data.data.id}`);
+        router.refresh();
       } else {
         toast.show('error', data.message || '发布失败');
         turnstileRef.current?.reset();

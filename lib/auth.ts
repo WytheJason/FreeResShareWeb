@@ -14,6 +14,11 @@ import type { UserRole, UserProfile } from './types';
 /**
  * 获取当前登录用户的 user_profile 记录
  * 未登录返回 null
+ *
+ * 重要：
+ * - auth.getUser() 用绑定会话的 supabase 客户端验证 token（需要 cookie）
+ * - user_profile 查询改用 admin 绕过 RLS，因为 auth.getUser() 已验证身份
+ *   RLS 策略可能因配置问题阻止读取，导致已登录用户被判为未登录
  */
 export async function getCurrentUser(): Promise<UserProfile | null> {
   try {
@@ -24,7 +29,10 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
 
     if (!user) return null;
 
-    const { data: profile } = await supabase
+    // 使用 admin 绕过 RLS 查询 user_profile
+    // auth.getUser() 已验证用户身份，此处仅读取附加资料
+    const admin = getSupabaseServiceAdmin();
+    const { data: profile } = await admin
       .from('user_profile')
       .select('*')
       .eq('id', user.id)
