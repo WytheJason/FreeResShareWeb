@@ -29,7 +29,6 @@ import PostCard from '@/components/PostCard';
 import Empty from '@/components/Empty';
 import SearchBox from '@/components/SearchBox';
 import PaginationLink from '@/components/PaginationLink';
-import AdSense from '@/components/AdSense';
 
 // 最新分区每页条数
 const LATEST_PAGE_SIZE = 12;
@@ -340,12 +339,6 @@ export default async function HomePage({
           <Empty text="没有找到匹配的资源" />
         )}
 
-        {/* 广告位：列表底部（分页前） */}
-        <AdSense
-          slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_TOP}
-          label="赞助内容"
-        />
-
         {/* 分页 */}
         {result.total_pages > 1 && (
           <div className="flex justify-center pt-2">
@@ -374,12 +367,6 @@ export default async function HomePage({
 
       {/* 搜索框 */}
       <SearchBox currentSearch={currentSearch} />
-
-      {/* 广告位：首页顶部（搜索框下、置顶资源上） */}
-      <AdSense
-        slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_TOP}
-        label="赞助内容"
-      />
 
       {/* 置顶资源 */}
       <section>
@@ -410,12 +397,6 @@ export default async function HomePage({
           <Empty text="暂无资源" />
         )}
       </section>
-
-      {/* 广告位：首页信息流（最新资源与热门资源之间） */}
-      <AdSense
-        slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME_INFEED}
-        label="赞助内容"
-      />
 
       {/* 热门资源 */}
       <section>
