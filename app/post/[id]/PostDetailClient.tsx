@@ -19,6 +19,7 @@ import { useToast } from '@/components/Toast';
 import PostHeader from './PostHeader';
 import ResourceCard from './ResourceCard';
 import CommentSection from './CommentSection';
+import AdSense from '@/components/AdSense';
 
 interface PostDetailClientProps {
   post: PostDetail;
@@ -170,6 +171,12 @@ export default function PostDetailClient({
           )}
         </div>
       )}
+
+      {/* 广告位：帖子内容与评论区之间（高曝光位） */}
+      <AdSense
+        slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_POST}
+        label="赞助内容"
+      />
 
       {/* 评论区 */}
       <CommentSection
