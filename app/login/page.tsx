@@ -104,9 +104,16 @@ export default function LoginPage() {
       const data = await res.json();
       if (data.code === 0) {
         toast.show('success', '登录成功');
-        // 短暂延迟确保 toast 显示
+        // 服务端已通过 Set-Cookie 写入会话；主动同步浏览器端 Supabase 客户端，
+        // 从 cookie 读取 refresh_token 并刷新会话，触发 onAuthStateChange，
+        // 使 Navbar 等客户端组件即时更新登录态（无需整页刷新）。
+        try {
+          await getSupabaseBrowser().auth.refreshSession();
+        } catch {
+          // 同步失败不阻塞跳转；middleware 会在后续请求中继续刷新会话
+        }
+        // 平滑客户端跳转，不再调用 router.refresh() 避免页面重渲染闪烁
         router.push(redirect);
-        router.refresh();
       } else {
         toast.show('error', data.message || '登录失败');
       }
