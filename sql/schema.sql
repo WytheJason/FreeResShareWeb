@@ -373,6 +373,29 @@ create policy "covers_delete_owner" on storage.objects
     for delete using (bucket_id = 'covers' and owner = auth.uid());
 
 -- ============================================================================
+-- Storage 桶：avatars（用户头像，公开可读）
+-- ============================================================================
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+drop policy if exists "avatars_read_public" on storage.objects;
+create policy "avatars_read_public" on storage.objects
+    for select using (bucket_id = 'avatars');
+
+drop policy if exists "avatars_upload_auth" on storage.objects;
+create policy "avatars_upload_auth" on storage.objects
+    for insert with check (bucket_id = 'avatars' and auth.role() = 'authenticated');
+
+drop policy if exists "avatars_delete_owner" on storage.objects;
+create policy "avatars_delete_owner" on storage.objects
+    for delete using (bucket_id = 'avatars' and owner = auth.uid());
+
+drop policy if exists "avatars_update_owner" on storage.objects;
+create policy "avatars_update_owner" on storage.objects
+    for update using (bucket_id = 'avatars' and owner = auth.uid());
+
+-- ============================================================================
 -- 初始化首个管理员（手动执行）
 -- ============================================================================
 -- 部署完成后，先用前端注册一个管理员账号，

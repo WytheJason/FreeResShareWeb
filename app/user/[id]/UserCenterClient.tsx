@@ -10,7 +10,7 @@
  * - 两个对话框：编辑资料（Turnstile 校验）、修改密码
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import type { Post, UserProfile, PageResult } from '@/lib/types';
 import { formatRegisterDuration, formatRelativeTime } from '@/lib/utils';
+import { getSupabaseBrowser } from '@/lib/supabase';
 import PostCard from '@/components/PostCard';
 import Pagination from '@/components/Pagination';
 import Empty from '@/components/Empty';
@@ -139,6 +140,8 @@ export default function UserCenterClient({
   });
   const editTurnstileRef = useRef<TurnstileWidgetHandle>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
+  // 头像本地上传状态
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   // ========== 修改密码 ==========
   const [pwdOpen, setPwdOpen] = useState(false);
@@ -174,6 +177,54 @@ export default function UserCenterClient({
     params.set('tab', tab);
     params.set('page', String(page));
     router.push(`?${params.toString()}`);
+  }
+
+  // ========== 头像本地上传 ==========
+  // 上传到 Supabase Storage 的 avatars 桶（需先执行 sql/add_avatars_bucket.sql 建桶）
+  // 路径：avatars/{userId}/{timestamp}-{filename}，公开读取
+  async function handleAvatarUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!isOwner || !profile.id) {
+      toast.show('error', '无权操作');
+      return;
+    }
+    // 类型校验：仅允许常见图片格式
+    if (!/^image\/(png|jpe?g|gif|webp|svg\+xml)$/.test(file.type)) {
+      toast.show('error', '仅支持 PNG / JPG / GIF / WEBP / SVG 格式');
+      return;
+    }
+    // 大小校验：头像限制 2MB
+    if (file.size > 2 * 1024 * 1024) {
+      toast.show('error', '头像图片不能超过 2MB');
+      return;
+    }
+
+    const supabase = getSupabaseBrowser();
+    // 文件名清洗（去除空格与特殊字符，避免存储路径异常）
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${profile.id}/${Date.now()}-${safeName}`;
+
+    setAvatarUploading(true);
+    try {
+      const { error } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { cacheControl: '3600', upsert: false });
+      if (error) {
+        toast.show('error', '头像上传失败：' + error.message);
+        return;
+      }
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+      // 上传成功后回填到编辑表单（与粘贴链接共用同一字段）
+      setEditForm((f) => ({ ...f, avatar: data.publicUrl }));
+      toast.show('success', '头像已上传，记得保存');
+    } catch {
+      toast.show('error', '上传失败，请重试');
+    } finally {
+      setAvatarUploading(false);
+      // 清空 input，允许重复选择同一文件触发 change
+      e.target.value = '';
+    }
   }
 
   // ========== 提交编辑资料 ==========
@@ -737,13 +788,30 @@ export default function UserCenterClient({
                 />
               </div>
               <div>
-                <label className="text-xs text-text-dim">头像链接</label>
-                <input
-                  value={editForm.avatar}
-                  onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
-                  className="input-field mt-1"
-                  placeholder="https://... 图片地址"
-                />
+                <label className="text-xs text-text-dim">头像</label>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    value={editForm.avatar}
+                    onChange={(e) => setEditForm({ ...editForm, avatar: e.target.value })}
+                    className="input-field flex-1"
+                    placeholder="粘贴图片地址，或点右侧本地上传"
+                  />
+                  <label
+                    className={`btn-secondary shrink-0 cursor-pointer whitespace-nowrap ${
+                      avatarUploading ? 'pointer-events-none opacity-60' : ''
+                    }`}
+                  >
+                    <Upload size={14} />
+                    {avatarUploading ? '上传中...' : '本地上传'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                      className="hidden"
+                      onChange={handleAvatarUpload}
+                      disabled={avatarUploading}
+                    />
+                  </label>
+                </div>
                 {editForm.avatar && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -753,6 +821,9 @@ export default function UserCenterClient({
                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 )}
+                <p className="mt-1 text-[10px] text-text-dim">
+                  支持 PNG / JPG / GIF / WEBP / SVG，≤ 2MB
+                </p>
               </div>
               <div>
                 <label className="text-xs text-text-dim">个人简介</label>
