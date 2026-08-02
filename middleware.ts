@@ -15,6 +15,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
+/**
+ * 等待 onAuthStateChange 异步回调完成
+ * @supabase/ssr 的 getUser() 刷新 token 后，通过 onAuthStateChange → applyServerStorage → setAll 异步设置 cookie
+ * 回调内部有 await getAll / await setAll，需要 2+ 个微任务
+ * 使用 setTimeout(0) 宏任务等待所有微任务执行完毕，确保 cookie 已写入 res
+ */
+function waitForAuthCookieFlush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 const LOG_ENABLED = false;
 
 // ---------- 配置：轻量限流 ----------
@@ -123,6 +133,8 @@ export async function middleware(req: NextRequest) {
     // 重要：不使用 getSession()，它只读本地不验证，可能返回过期/伪造的 session
     try {
       await supabase.auth.getUser();
+      // 等待 onAuthStateChange 异步回调完成，确保刷新后的 cookie 已写入 res
+      await waitForAuthCookieFlush();
     } catch (e) {
       // getUser 失败不阻塞请求，让后续逻辑自行处理未登录状态
       if (LOG_ENABLED) {

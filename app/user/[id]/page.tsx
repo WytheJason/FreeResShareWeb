@@ -6,7 +6,7 @@
  */
 
 import { notFound } from 'next/navigation';
-import { getSupabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServer, getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { getCurrentUser } from '@/lib/auth';
 import { maskPanUrl, maskPanCode } from '@/lib/security';
 import { calcPageRange, calcTotalPages } from '@/lib/utils';
@@ -107,15 +107,11 @@ export default async function UserPage({
   params: { id: string };
   searchParams: { tab?: string; page?: string };
 }) {
-  const supabase = await getSupabaseServer().catch(() => null);
-  if (!supabase) {
-    notFound();
-  }
-  const currentUser = await getCurrentUser();
-  const isOwner = !!currentUser && currentUser.id === params.id;
-
   // ---------- 1. 查询用户资料 ----------
-  const { data: profileData } = await supabase
+  // 使用 service_role 绕过 RLS，因为用户资料（昵称/头像/等级）为公开信息
+  // 否则未登录或访问他人主页时 RLS 会阻止读取，导致 notFound() 误触发 404
+  const admin = getSupabaseServiceAdmin();
+  const { data: profileData } = await admin
     .from('user_profile')
     .select('*')
     .eq('id', params.id)
@@ -124,7 +120,19 @@ export default async function UserPage({
   if (!profileData) {
     notFound();
   }
-  const profile = profileData as UserProfile;
+  const profileRaw = profileData as UserProfile;
+
+  // 获取当前登录用户（可能为 null，如未登录访问他人主页）
+  const currentUser = await getCurrentUser();
+  const isOwner = !!currentUser && currentUser.id === params.id;
+
+  // 非本人访问时隐藏 email 等敏感字段
+  const profile: UserProfile = isOwner
+    ? profileRaw
+    : { ...profileRaw, email: '' };
+
+  // 用户级数据查询使用绑定会话的客户端（受 RLS 约束，保护私有数据）
+  const supabase = await getSupabaseServer().catch(() => null);
 
   // ---------- 1.5. 统计数据（仅本人可见额外信息）----------
   const userStats: UserStats = {
@@ -133,7 +141,7 @@ export default async function UserPage({
     collect_count: 0,
     view_count: 0,
   };
-  if (isOwner) {
+  if (isOwner && supabase) {
     const [{ count: collectCount }, { count: viewCount }] = await Promise.all([
       supabase
         .from('collect')
@@ -159,13 +167,15 @@ export default async function UserPage({
   const showNoPermission = isOwnerOnlyTab && !isOwner;
 
   // ---------- 3. 根据 tab 查询数据 ----------
+  // 帖子列表和评论列表为公开数据，使用 admin 绕过 RLS 查询
+  // 收藏/浏览记录为私有数据，使用绑定会话的 supabase 客户端（受 RLS 保护）
   const { from, to } = calcPageRange(page, PAGE_SIZE);
   let list: (Post | UserCommentItem)[] = [];
   let total = 0;
 
   if (!showNoPermission) {
     if (tab === 'posts') {
-      const { data, count } = await supabase
+      const { data, count } = await admin
         .from('posts')
         .select(POST_SELECT, { count: 'exact' })
         .eq('author_id', params.id)
@@ -174,7 +184,7 @@ export default async function UserPage({
       list = ((data ?? []) as PostRaw[]).map(toPost);
       total = count ?? 0;
     } else if (tab === 'comments') {
-      const { data, count } = await supabase
+      const { data, count } = await admin
         .from('comments')
         .select(
           'id, content, created_at, post_id, post:posts!comments_post_id_fkey(title)',
@@ -196,29 +206,34 @@ export default async function UserPage({
       total = count ?? 0;
     } else if (tab === 'collects') {
       // 本人收藏：关联帖子，返回完整 Post 列表
-      const { data, count } = await supabase
-        .from('collect')
-        .select(`id, post_id, post:posts!collect_post_id_fkey(${POST_SELECT})`, {
-          count: 'exact',
-        })
-        .eq('user_id', params.id)
-        .order('created_at', { ascending: false })
-        .range(from, to);
-      list = ((data ?? []) as CollectRaw[])
-        .map((item) => pickFirst<PostRaw>(item.post))
-        .filter((p): p is PostRaw => !!p)
-        .map(toPost);
-      total = count ?? 0;
+      // supabase 可能为 null（session 异常），此时返回空列表
+      if (supabase) {
+        const { data, count } = await supabase
+          .from('collect')
+          .select(`id, post_id, post:posts!collect_post_id_fkey(${POST_SELECT})`, {
+            count: 'exact',
+          })
+          .eq('user_id', params.id)
+          .order('created_at', { ascending: false })
+          .range(from, to);
+        list = ((data ?? []) as CollectRaw[])
+          .map((item) => pickFirst<PostRaw>(item.post))
+          .filter((p): p is PostRaw => !!p)
+          .map(toPost);
+        total = count ?? 0;
+      }
     } else if (tab === 'history') {
       // 浏览记录：按 view_count 倒序的推荐帖子
-      const { data, count } = await supabase
-        .from('posts')
-        .select(POST_SELECT, { count: 'exact' })
-        .eq('status', 'normal')
-        .order('view_count', { ascending: false })
-        .range(from, to);
-      list = ((data ?? []) as PostRaw[]).map(toPost);
-      total = count ?? 0;
+      if (supabase) {
+        const { data, count } = await supabase
+          .from('posts')
+          .select(POST_SELECT, { count: 'exact' })
+          .eq('status', 'normal')
+          .order('view_count', { ascending: false })
+          .range(from, to);
+        list = ((data ?? []) as PostRaw[]).map(toPost);
+        total = count ?? 0;
+      }
     }
   }
 
