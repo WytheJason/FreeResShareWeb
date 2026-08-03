@@ -52,9 +52,6 @@ export default function PostCard({ post }: PostCardProps) {
             src={panIconUrl}
             alt={PAN_TYPE_LABELS[post.pan_type]}
             className="h-3 w-3"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
           />
           {PAN_TYPE_LABELS[post.pan_type]}
         </span>
