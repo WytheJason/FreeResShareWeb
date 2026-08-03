@@ -37,6 +37,7 @@ import type {
 import { CATEGORY_LABELS, PAN_TYPE_LABELS } from '@/lib/types';
 import { useToast } from '@/components/Toast';
 import { Spinner } from '@/components/Loading';
+import Toggle from '@/components/Toggle';
 import TurnstileWidget, { type TurnstileWidgetHandle } from '@/components/TurnstileWidget';
 
 // 网盘类型对应的合法域名（前端简单校验，后端会再做严格校验）
@@ -562,63 +563,57 @@ export default function PublishPage() {
           </div>
 
           {/* VIP 加密开关 */}
-          <div className="flex items-start justify-between rounded-lg border border-border bg-bg-surface px-4 py-3">
-            <div className="flex-1">
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-bg-surface px-4 py-3.5 transition-colors hover:border-primary-500/30">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <Crown size={14} className="text-gold-400" />
+                <Crown size={15} className="text-gold-400" />
                 <span className="text-sm font-medium text-text-primary">
                   VIP 加密
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                  isVip
+                    ? 'bg-gold-500/20 text-gold-300'
+                    : 'bg-bg-elevated text-text-muted'
+                }`}>
+                  {isVip ? '开启' : '关闭'}
                 </span>
               </div>
               <p className="mt-1 text-xs text-text-muted">
                 开启后仅 VIP 会员可查看完整网盘链接
               </p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={isVip}
-              onClick={() => setIsVip((v) => !v)}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                isVip ? 'bg-gold-500' : 'bg-border-subtle'
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  isVip ? 'translate-x-5' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
+            <Toggle
+              checked={isVip}
+              onChange={setIsVip}
+              color="gold"
+            />
           </div>
 
           {/* 需要登录查看开关 */}
-          <div className="flex items-start justify-between rounded-lg border border-border bg-bg-surface px-4 py-3">
-            <div className="flex-1">
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-bg-surface px-4 py-3.5 transition-colors hover:border-primary-500/30">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <Lock size={14} className="text-blue-400" />
+                <Lock size={15} className="text-blue-400" />
                 <span className="text-sm font-medium text-text-primary">
                   需要登录查看
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                  needLogin
+                    ? 'bg-blue-500/20 text-blue-300'
+                    : 'bg-bg-elevated text-text-muted'
+                }`}>
+                  {needLogin ? '开启' : '关闭'}
                 </span>
               </div>
               <p className="mt-1 text-xs text-text-muted">
                 关闭后访客无需登录即可查看资源链接，开启后需登录
               </p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={needLogin}
-              onClick={() => setNeedLogin((v) => !v)}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                needLogin ? 'bg-blue-500' : 'bg-border-subtle'
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                  needLogin ? 'translate-x-5' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
+            <Toggle
+              checked={needLogin}
+              onChange={setNeedLogin}
+              color="blue"
+            />
           </div>
 
           {/* 积分费用设置 */}
