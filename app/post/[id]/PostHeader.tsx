@@ -24,7 +24,7 @@ export default function PostHeader({ post }: PostHeaderProps) {
           <img
             src={post.cover_url}
             alt={post.title}
-            className="max-h-96 w-full object-cover"
+            className="max-h-96 w-full object-contain"
           />
         ) : (
           <div className="flex h-48 w-full items-center justify-center bg-gradient-to-br from-primary-600/30 via-primary-700/20 to-bg-surface">

@@ -428,7 +428,7 @@ export default function PublishPage() {
                 <img
                   src={coverUrl}
                   alt="封面预览"
-                  className="aspect-video w-full object-cover"
+                  className="aspect-video w-full object-contain"
                 />
                 <button
                   type="button"

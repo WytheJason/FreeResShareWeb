@@ -29,7 +29,7 @@ export default function PostCard({ post }: PostCardProps) {
           <img
             src={post.cover_url}
             alt={post.title}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary-600/30 via-primary-700/20 to-bg-surface">
