@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <!-- 白色圆角底衬 -->
+  <rect x="5" y="5" width="170" height="170" rx="36" ry="36" fill="#ffffff" stroke="#e2e8f0" stroke-width="3"/>
+  <!-- 主色 Sparkles（闪烁星）图标，与 Navbar/登录页风格一致 -->
+  <g transform="translate(42 42)" fill="none" stroke="#6366f1" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M47.5 7.5 L57.5 40 L90 50 L57.5 60 L47.5 92.5 L37.5 60 L5 50 L37.5 40 Z"/>
+    <path d="M87.5 7.5 L91 16.5 L100 20 L91 23.5 L87.5 32.5 L84 23.5 L75 20 L84 16.5 Z"/>
+    <path d="M22.5 72.5 L24.5 77 L29 79 L24.5 81 L22.5 85.5 L20.5 81 L16 79 L20.5 77 Z"/>
+  </g>
+</svg>

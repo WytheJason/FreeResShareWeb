@@ -214,8 +214,8 @@ export default function LoginPage() {
       <div className="card overflow-hidden p-6 fade-in">
         {/* Logo / 标题 */}
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 shadow-lg shadow-primary-600/30">
-            <Sparkles className="text-white" size={22} />
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl border border-border bg-white shadow-sm">
+            <Sparkles className="text-primary-600" size={22} />
           </div>
           <h1 className="text-xl font-bold text-text-primary">环梦网盘资源分享论坛</h1>
           <p className="mt-1 text-xs text-text-muted">登录后即可发布资源与评论</p>
