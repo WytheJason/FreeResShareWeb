@@ -35,9 +35,10 @@ export default function Avatar({
     <img
       src={src!}
       alt={alt || name}
-      className={`${className} rounded-full object-cover`}
+      className={`${className} shrink-0 rounded-full object-cover`}
       onError={() => setImgError(true)}
       loading="lazy"
+      referrerPolicy="no-referrer"
     />
   ) : (
     <div

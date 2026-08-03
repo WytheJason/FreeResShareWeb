@@ -806,15 +806,13 @@ export default function UserCenterClient({
                     />
                   </label>
                 </div>
-                {editForm.avatar && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                <div className="mt-2">
+                  <Avatar
                     src={editForm.avatar}
-                    alt="预览"
-                    className="mt-2 h-16 w-16 rounded-lg object-cover border border-border"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    name={editForm.nickname}
+                    className="h-16 w-16 rounded-lg"
                   />
-                )}
+                </div>
                 <p className="mt-1 text-[10px] text-text-dim">
                   支持 PNG / JPG / GIF / WEBP / SVG，≤ 2MB
                 </p>
