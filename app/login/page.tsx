@@ -3,7 +3,7 @@
 /**
  * 登录 / 注册页（客户端组件）
  * - Tab 切换：登录 / 注册（默认登录）
- * - 登录表单：email + password + 显示/隐藏密码
+ * - 登录表单：email + password + 显示/隐藏密码 + Turnstile 验证
  * - 注册表单：email + password + confirm_password + nickname(可选) + Turnstile 验证
  * - 已登录用户访问自动跳转首页
  * - 登录成功后跳转到 redirect 参数或 '/'
@@ -96,10 +96,21 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
+      const token = await turnstileRef.current?.getToken();
+      if (!token) {
+        toast.show('error', '请先完成人机验证');
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPwd }),
+        body: JSON.stringify({
+          email: loginEmail,
+          password: loginPwd,
+          captcha: { type: 'turnstile', token },
+        }),
       });
       const data = await res.json();
       if (data.code === 0) {
@@ -116,9 +127,11 @@ export default function LoginPage() {
         router.push(redirect);
       } else {
         toast.show('error', data.message || '登录失败');
+        turnstileRef.current?.reset();
       }
     } catch {
       toast.show('error', '网络错误，请稍后重试');
+      turnstileRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -293,6 +306,23 @@ export default function LoginPage() {
                   {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
+            </div>
+
+            {/* 人机验证 */}
+            <div>
+              <label className="mb-1 block text-xs text-text-muted">
+                人机验证
+              </label>
+              <TurnstileWidget
+                ref={turnstileRef}
+                siteKey={turnstileSiteKey}
+                onSuccess={() => {
+                  console.log('[Turnstile Login] 验证成功');
+                }}
+                onError={(error) => {
+                  toast.show('error', `验证失败: ${error}`);
+                }}
+              />
             </div>
 
             <button

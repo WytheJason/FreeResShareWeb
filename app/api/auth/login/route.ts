@@ -1,5 +1,6 @@
 /**
  * 登录接口
+ * - 校验 Cloudflare Turnstile token
  * - 调用 Supabase Auth signInWithPassword
  * - 返回用户基本信息
  *
@@ -8,14 +9,52 @@
  */
 import { NextResponse } from 'next/server';
 import { getSupabaseServer, getSupabaseServiceAdmin, waitForAuthCookieFlush } from '@/lib/supabase-server';
+import { verifyTurnstileToken, getTurnstileSecretKey } from '@/lib/turnstile';
 import { successResponse, errorResponse, HTTP_STATUS, isValidEmail } from '@/lib/utils';
+
+// 强制动态渲染，防止 Vercel 静态化导致 API 阻塞
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+interface TurnstileCaptcha {
+  type: 'turnstile';
+  token: string;
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password } = body as { email: string; password: string };
+    const { email, password, captcha } = body as {
+      email: string;
+      password: string;
+      captcha?: TurnstileCaptcha;
+    };
 
-    // ---------- 参数校验 ----------
+    // ---------- 1. Turnstile 验证 ----------
+    if (!captcha || !captcha.type || captcha.type !== 'turnstile') {
+      return NextResponse.json(errorResponse('缺少验证参数', 403), {
+        status: HTTP_STATUS.FORBIDDEN,
+      });
+    }
+    if (!captcha.token) {
+      return NextResponse.json(errorResponse('请先完成人机验证', 403), {
+        status: HTTP_STATUS.FORBIDDEN,
+      });
+    }
+
+    const secretKey = getTurnstileSecretKey();
+    if (!secretKey) {
+      console.warn('[Auth Login] 未配置 TURNSTILE_SECRET_KEY，跳过验证');
+    } else {
+      const result = await verifyTurnstileToken(captcha.token, secretKey);
+      if (!result.success) {
+        return NextResponse.json(errorResponse(`人机验证失败: ${result.error || '未知错误'}`, 403), {
+          status: HTTP_STATUS.FORBIDDEN,
+        });
+      }
+    }
+
+    // ---------- 2. 参数校验 ----------
     if (!isValidEmail(email)) {
       return NextResponse.json(errorResponse('邮箱格式不正确', 1), {
         status: HTTP_STATUS.BAD_REQUEST,
