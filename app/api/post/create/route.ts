@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       pan_type,
       pan_url,
       pan_code,
+      pan_links,
       is_vip,
       points_cost,
       captcha,
@@ -101,21 +102,66 @@ export async function POST(request: Request) {
           status: HTTP_STATUS.BAD_REQUEST,
         });
       }
-      if (!pan_type || !PAN_TYPE_WHITELIST.includes(pan_type)) {
-        return NextResponse.json(errorResponse('网盘类型不合法', 1), {
-          status: HTTP_STATUS.BAD_REQUEST,
+      // ---------- 4.1 多网盘链接校验 ----------
+      // pan_links 为数组，至少 1 条，最多 5 条
+      // 兼容旧逻辑：若未传 pan_links，则用 pan_type/pan_url/pan_code 构造
+      let validatedLinks: Array<{ type: PanType; url: string; code: string }> = [];
+
+      if (Array.isArray(pan_links) && pan_links.length > 0) {
+        if (pan_links.length > 5) {
+          return NextResponse.json(errorResponse('网盘链接最多 5 条', 1), {
+            status: HTTP_STATUS.BAD_REQUEST,
+          });
+        }
+        for (let i = 0; i < pan_links.length; i++) {
+          const link = pan_links[i];
+          if (!link || !PAN_TYPE_WHITELIST.includes(link.type)) {
+            return NextResponse.json(errorResponse(`第 ${i + 1} 条链接网盘类型不合法`, 1), {
+              status: HTTP_STATUS.BAD_REQUEST,
+            });
+          }
+          if (!isValidPanUrl(link.type, link.url)) {
+            return NextResponse.json(errorResponse(`第 ${i + 1} 条链接格式不正确`, 1), {
+              status: HTTP_STATUS.BAD_REQUEST,
+            });
+          }
+          if (!isValidPanCode(link.code ?? '')) {
+            return NextResponse.json(errorResponse(`第 ${i + 1} 条链接提取码格式不正确（0-8 位字母数字）`, 1), {
+              status: HTTP_STATUS.BAD_REQUEST,
+            });
+          }
+          validatedLinks.push({
+            type: link.type,
+            url: link.url.trim(),
+            code: (link.code ?? '').trim(),
+          });
+        }
+      } else {
+        // 兼容旧逻辑：用单个字段构造
+        if (!pan_type || !PAN_TYPE_WHITELIST.includes(pan_type)) {
+          return NextResponse.json(errorResponse('网盘类型不合法', 1), {
+            status: HTTP_STATUS.BAD_REQUEST,
+          });
+        }
+        if (!isValidPanUrl(pan_type, pan_url)) {
+          return NextResponse.json(errorResponse('网盘链接格式不正确', 1), {
+            status: HTTP_STATUS.BAD_REQUEST,
+          });
+        }
+        if (!isValidPanCode(pan_code ?? '')) {
+          return NextResponse.json(errorResponse('提取码格式不正确（0-8 位字母数字）', 1), {
+            status: HTTP_STATUS.BAD_REQUEST,
+          });
+        }
+        validatedLinks.push({
+          type: pan_type,
+          url: pan_url.trim(),
+          code: (pan_code ?? '').trim(),
         });
       }
-      if (!isValidPanUrl(pan_type, pan_url)) {
-        return NextResponse.json(errorResponse('网盘链接格式不正确', 1), {
-          status: HTTP_STATUS.BAD_REQUEST,
-        });
-      }
-      if (!isValidPanCode(pan_code ?? '')) {
-        return NextResponse.json(errorResponse('提取码格式不正确（0-8 位字母数字）', 1), {
-          status: HTTP_STATUS.BAD_REQUEST,
-        });
-      }
+
+      // 取第一条作为主链接（pan_type/pan_url/pan_code 向后兼容）
+      const primaryLink = validatedLinks[0];
 
       // ---------- 5. 内容安全处理 ----------
       const safeDescription = sanitizeUserContent(descRaw);
@@ -139,9 +185,10 @@ export async function POST(request: Request) {
           description: safeDescription,
           cover_url: (cover_url ?? '').trim(),
           category,
-          pan_type,
-          pan_url: pan_url.trim(),
-          pan_code: (pan_code ?? '').trim(),
+          pan_type: primaryLink.type,
+          pan_url: primaryLink.url,
+          pan_code: primaryLink.code,
+          pan_links: validatedLinks,
           is_vip: !!is_vip,
           points_cost: safePointsCost,
           author_id: user.id,

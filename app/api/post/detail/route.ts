@@ -14,7 +14,7 @@ import {
 } from '@/lib/auth';
 import { maskPanUrl, maskPanCode } from '@/lib/security';
 import { successResponse, errorResponse, HTTP_STATUS } from '@/lib/utils';
-import type { PostDetail } from '@/lib/types';
+import type { PostDetail, PanLink } from '@/lib/types';
 
 // 禁止缓存，确保增删改后数据立即同步
 export const dynamic = 'force-dynamic';
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     const { data: post, error } = await supabase
       .from('posts')
       .select(
-        'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, points_cost, author:user_profile!posts_author_id_fkey(nickname, avatar)'
+        'id, title, description, cover_url, category, pan_type, pan_url, pan_code, pan_links, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, points_cost, author:user_profile!posts_author_id_fkey(nickname, avatar)'
       )
       .eq('id', id)
       .single();
@@ -109,6 +109,22 @@ export async function GET(request: Request) {
 
   // ---------- 6. 组装返回 ----------
     const author = (post as any).author?.[0] ?? (post as any).author ?? {};
+
+    // 构建多链接列表：优先用 pan_links，为 null 时回退到单链接
+    const rawPanLinks: PanLink[] =
+      (post as any).pan_links && Array.isArray((post as any).pan_links) && (post as any).pan_links.length > 0
+        ? (post as any).pan_links
+        : [{ type: post.pan_type, url: post.pan_url, code: post.pan_code }];
+
+    // 根据权限脱敏多链接
+    const maskedPanLinks: PanLink[] = canViewLink
+      ? rawPanLinks
+      : rawPanLinks.map((link) => ({
+          type: link.type,
+          url: maskPanUrl(link.url),
+          code: maskPanCode(),
+        }));
+
     const detail: PostDetail = {
       id: post.id,
       title: post.title,
@@ -118,6 +134,7 @@ export async function GET(request: Request) {
       pan_type: post.pan_type,
       pan_url: canViewLink ? post.pan_url : maskPanUrl(post.pan_url),
       pan_code: canViewCode ? post.pan_code : maskPanCode(),
+      pan_links: canViewLink ? rawPanLinks : null,
       is_vip: post.is_vip,
       is_top: post.is_top,
       hot_weight: post.hot_weight,
@@ -134,6 +151,7 @@ export async function GET(request: Request) {
       is_collected: isCollected,
       is_author: isAuthor,
       masked_pan_url: canViewLink ? undefined : maskPanUrl(post.pan_url),
+      masked_pan_links: maskedPanLinks,
       points_cost: Number((post as any).points_cost ?? 0),
       is_unlocked: isUnlocked,
     };

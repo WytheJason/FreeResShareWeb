@@ -25,6 +25,7 @@ import type {
   PageResult,
   PostCategory,
   PanType,
+  PanLink,
   PostStatus,
   UserProfile,
 } from '@/lib/types';
@@ -40,6 +41,7 @@ interface PostRaw {
   pan_type: PanType;
   pan_url: string;
   pan_code: string;
+  pan_links: PanLink[] | null;
   is_vip: boolean;
   is_top: boolean;
   hot_weight: number;
@@ -100,7 +102,7 @@ export default async function PostDetailPage({
   const { data: rawData, error } = await admin
     .from('posts')
     .select(
-      'id, title, description, cover_url, category, pan_type, pan_url, pan_code, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, points_cost, author:user_profile!posts_author_id_fkey(nickname, avatar)'
+      'id, title, description, cover_url, category, pan_type, pan_url, pan_code, pan_links, is_vip, is_top, hot_weight, status, view_count, comment_count, author_id, created_at, updated_at, points_cost, author:user_profile!posts_author_id_fkey(nickname, avatar)'
     )
     .eq('id', params.id)
     .single();
@@ -171,6 +173,22 @@ export default async function PostDetailPage({
 
   // ---------- 5. 组装 PostDetail ----------
   const author = pickFirst<{ nickname?: string; avatar?: string }>(raw.author);
+
+  // 构建多链接列表：优先用 pan_links，为 null 时回退到单链接
+  const allPanLinks: PanLink[] =
+    raw.pan_links && Array.isArray(raw.pan_links) && raw.pan_links.length > 0
+      ? raw.pan_links
+      : [{ type: raw.pan_type, url: raw.pan_url, code: raw.pan_code }];
+
+  // 根据权限脱敏多链接
+  const maskedPanLinks: PanLink[] = canViewLink
+    ? allPanLinks
+    : allPanLinks.map((link) => ({
+        type: link.type,
+        url: maskPanUrl(link.url),
+        code: maskPanCode(),
+      }));
+
   const post: PostDetail = {
     id: raw.id,
     title: raw.title,
@@ -180,6 +198,7 @@ export default async function PostDetailPage({
     pan_type: raw.pan_type,
     pan_url: canViewLink ? raw.pan_url : maskPanUrl(raw.pan_url),
     pan_code: canViewCode ? raw.pan_code : maskPanCode(),
+    pan_links: canViewLink ? allPanLinks : null,
     is_vip: raw.is_vip,
     is_top: raw.is_top,
     hot_weight: raw.hot_weight,
@@ -198,6 +217,7 @@ export default async function PostDetailPage({
     is_author: isAuthor,
     is_unlocked: isUnlocked,
     masked_pan_url: canViewLink ? undefined : maskPanUrl(raw.pan_url),
+    masked_pan_links: maskedPanLinks,
   };
 
   // ---------- 6. 查询第一页评论（构建嵌套后内存分页根评论）----------

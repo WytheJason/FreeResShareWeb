@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     // ---------- 1. 查询帖子信息 ----------
     const { data: post } = await admin
       .from('posts')
-      .select('id, title, pan_url, pan_code, points_cost, author_id, status')
+      .select('id, title, pan_url, pan_code, pan_links, points_cost, author_id, status')
       .eq('id', post_id)
       .single();
 
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     // 作者无需解锁
     if (post.author_id === user.id) {
       return NextResponse.json(
-        successResponse({ pan_url: post.pan_url, pan_code: post.pan_code }, '作者无需解锁'),
+        successResponse({ pan_url: post.pan_url, pan_code: post.pan_code, pan_links: post.pan_links }, '作者无需解锁'),
         { status: HTTP_STATUS.OK }
       );
     }
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     // 免费资源无需解锁
     if (post.points_cost <= 0) {
       return NextResponse.json(
-        successResponse({ pan_url: post.pan_url, pan_code: post.pan_code }, '免费资源无需解锁'),
+        successResponse({ pan_url: post.pan_url, pan_code: post.pan_code, pan_links: post.pan_links }, '免费资源无需解锁'),
         { status: HTTP_STATUS.OK }
       );
     }
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
     if (unlockRecord) {
       // 已解锁，直接返回链接
       return NextResponse.json(
-        successResponse({ pan_url: post.pan_url, pan_code: post.pan_code }, '已解锁，无需重复扣费'),
+        successResponse({ pan_url: post.pan_url, pan_code: post.pan_code, pan_links: post.pan_links }, '已解锁，无需重复扣费'),
         { status: HTTP_STATUS.OK }
       );
     }
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       successResponse(
-        { pan_url: post.pan_url, pan_code: post.pan_code, cost_points: post.points_cost },
+        { pan_url: post.pan_url, pan_code: post.pan_code, pan_links: post.pan_links, cost_points: post.points_cost },
         `解锁成功，消耗 ${post.points_cost} 积分`
       ),
       { status: HTTP_STATUS.OK }

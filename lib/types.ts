@@ -14,7 +14,9 @@ export type PointAction =
   | 'post_reward'     // 发帖奖励
   | 'comment_reward'  // 评论奖励
   | 'unlock_post'     // 解锁资源消费
-  | 'admin_adjust';   // 管理员调整
+  | 'admin_adjust'    // 管理员调整
+  | 'withdraw'        // 积分兑现消费
+  | 'withdraw_refund'; // 兑现拒绝退款
 
 // ============ 积分规则常量 ============
 export const POINT_RULES = {
@@ -39,6 +41,46 @@ export const POINT_ACTION_LABELS: Record<PointAction, string> = {
   comment_reward: '评论奖励',
   unlock_post: '解锁资源消费',
   admin_adjust: '管理员调整',
+  withdraw: '积分兑现',
+  withdraw_refund: '兑现退款',
+};
+
+// ============ 积分兑现档位 ============
+export interface WithdrawTier {
+  points: number;
+  amount: number;
+  label: string;
+}
+
+export const WITHDRAW_TIERS: WithdrawTier[] = [
+  { points: 2000, amount: 1, label: '2000 积分 → 1 元' },
+  { points: 5000, amount: 2, label: '5000 积分 → 2 元' },
+  { points: 10000, amount: 5, label: '10000 积分 → 5 元' },
+];
+
+// ============ 积分兑现记录 ============
+export type WithdrawStatus = 'pending' | 'approved' | 'rejected' | 'paid';
+
+export interface WithdrawRecord {
+  id: string;
+  user_id: string;
+  points_cost: number;
+  amount: number;
+  payment_method: 'alipay' | 'wxpay';
+  payment_account: string;
+  payment_name: string;
+  status: WithdrawStatus;
+  admin_note: string | null;
+  processed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const WITHDRAW_STATUS_LABELS: Record<WithdrawStatus, string> = {
+  pending: '待处理',
+  approved: '已通过',
+  rejected: '已拒绝',
+  paid: '已打款',
 };
 
 // ============ 帖子分类 ============
@@ -46,6 +88,16 @@ export type PostCategory = 'software' | 'movie';
 
 // ============ 网盘类型 ============
 export type PanType = 'baidu' | 'aliyun' | 'quark';
+
+// ============ 单个网盘链接 ============
+export interface PanLink {
+  /** 网盘类型 */
+  type: PanType;
+  /** 网盘链接 */
+  url: string;
+  /** 提取码（可为空） */
+  code: string;
+}
 
 // ============ 帖子状态 ============
 export type PostStatus = 'normal' | 'pending' | 'hidden';
@@ -103,6 +155,8 @@ export interface Post {
   pan_type: PanType;
   pan_url: string;
   pan_code: string;
+  /** 多网盘链接列表（详情页加载，列表页可能不加载） */
+  pan_links?: PanLink[] | null;
   is_vip: boolean;
   is_top: boolean;
   hot_weight: number;
@@ -130,6 +184,8 @@ export interface PostDetail extends Post {
   is_author: boolean;
   /** 脱敏后的网盘链接（无权查看时） */
   masked_pan_url?: string;
+  /** 脱敏后的多链接列表（无权查看时） */
+  masked_pan_links?: PanLink[];
   /** 当前用户是否已用积分解锁此资源 */
   is_unlocked: boolean;
 }
@@ -242,6 +298,8 @@ export interface PostForm {
   pan_type: PanType;
   pan_url: string;
   pan_code: string;
+  /** 多网盘链接列表（发布时提交） */
+  pan_links: PanLink[];
   is_vip: boolean;
   /** 查看资源所需积分（0=免费），范围 0-100 */
   points_cost: number;

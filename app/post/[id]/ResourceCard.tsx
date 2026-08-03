@@ -1,18 +1,18 @@
 'use client';
 
 /**
- * 网盘资源卡片
+ * 网盘资源卡片（支持多链接展示）
  * 根据权限分五种展示：
  * 1. 积分资源 + 未解锁 → 紫色边框 + Coins 图标 + 积分解锁按钮
  * 2. VIP 加密 + 无权限 → 金色边框 + Lock + 开通会员
  * 3. 公开 + 未登录 → 登录后查看
- * 4. 已解锁/有权限 → 完整链接 + 提取码 + 复制 + 打开链接
+ * 4. 已解锁/有权限 → 完整链接列表 + 提取码 + 复制 + 打开链接
  */
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { Lock, Copy, ExternalLink, Crown, Coins, Sparkles } from 'lucide-react';
-import type { PostDetail, UserProfile } from '@/lib/types';
+import type { PostDetail, UserProfile, PanLink } from '@/lib/types';
 import { PAN_TYPE_LABELS } from '@/lib/types';
 import { useToast } from '@/components/Toast';
 import { Spinner } from '@/components/Loading';
@@ -37,6 +37,29 @@ export default function ResourceCard({ post, currentUser }: ResourceCardProps) {
     }
   }
 
+  // 获取用于展示的链接列表（脱敏或真实）
+  const displayLinks: PanLink[] =
+    post.pan_links ?? post.masked_pan_links ?? [
+      { type: post.pan_type, url: post.pan_url, code: post.pan_code },
+    ];
+
+  // 渲染脱敏链接列表（用于未授权状态）
+  function renderMaskedLinks() {
+    return (
+      <div className="mt-2 space-y-1.5">
+        {displayLinks.map((link, idx) => (
+          <div
+            key={idx}
+            className="break-all rounded-md bg-bg-elevated px-3 py-2 text-xs text-text-muted"
+          >
+            <span className="mr-2 text-text-dim">[{PAN_TYPE_LABELS[link.type]}]</span>
+            {link.url}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   // 积分资源 + 未解锁（优先级最高）
   if (post.points_cost > 0 && !unlocked) {
     // 未登录 → 提示登录
@@ -46,14 +69,14 @@ export default function ResourceCard({ post, currentUser }: ResourceCardProps) {
           <div className="flex items-center gap-2">
             <Coins className="text-purple-400" size={18} />
             <span className="tag bg-purple-500/15 text-purple-300">积分资源</span>
-            <span className="tag">{PAN_TYPE_LABELS[post.pan_type]}</span>
+            {displayLinks.length > 1 && (
+              <span className="tag">{displayLinks.length} 个链接</span>
+            )}
           </div>
           <p className="mt-3 text-sm text-text-secondary">
             需要 <span className="font-bold text-purple-300">{post.points_cost}</span> 积分解锁查看
           </p>
-          <div className="mt-2 break-all rounded-md bg-bg-elevated px-3 py-2 text-xs text-text-muted">
-            {post.masked_pan_url || post.pan_url}
-          </div>
+          {renderMaskedLinks()}
           <Link href="/login" className="btn-primary mt-4">
             登录后解锁
           </Link>
@@ -68,7 +91,9 @@ export default function ResourceCard({ post, currentUser }: ResourceCardProps) {
         <div className="flex items-center gap-2">
           <Coins className="text-purple-400" size={18} />
           <span className="tag bg-purple-500/15 text-purple-300">积分资源</span>
-          <span className="tag">{PAN_TYPE_LABELS[post.pan_type]}</span>
+          {displayLinks.length > 1 && (
+            <span className="tag">{displayLinks.length} 个链接</span>
+          )}
         </div>
         <p className="mt-3 text-sm text-text-secondary">
           需要 <span className="font-bold text-purple-300">{post.points_cost}</span> 积分解锁查看
@@ -79,9 +104,7 @@ export default function ResourceCard({ post, currentUser }: ResourceCardProps) {
             {currentUser.points} 积分
           </span>
         </div>
-        <div className="mt-2 break-all rounded-md bg-bg-elevated px-3 py-2 text-xs text-text-muted">
-          {post.masked_pan_url || post.pan_url}
-        </div>
+        {renderMaskedLinks()}
 
         {hasEnoughPoints ? (
           <button
@@ -118,12 +141,12 @@ export default function ResourceCard({ post, currentUser }: ResourceCardProps) {
         <div className="flex items-center gap-2">
           <Lock className="text-gold-400" size={18} />
           <span className="tag tag-vip">VIP 专属资源</span>
-          <span className="tag">{PAN_TYPE_LABELS[post.pan_type]}</span>
+          {displayLinks.length > 1 && (
+            <span className="tag">{displayLinks.length} 个链接</span>
+          )}
         </div>
         <p className="mt-3 text-sm text-text-secondary">开通会员查看完整链接</p>
-        <div className="mt-2 break-all rounded-md bg-bg-elevated px-3 py-2 text-xs text-text-muted">
-          {post.masked_pan_url || post.pan_url}
-        </div>
+        {renderMaskedLinks()}
         <Link href="/vip" className="btn-gold mt-4">
           <Crown size={16} />
           开通会员
@@ -138,12 +161,12 @@ export default function ResourceCard({ post, currentUser }: ResourceCardProps) {
       <div className="card p-5">
         <div className="flex items-center gap-2">
           <Lock className="text-primary-400" size={18} />
-          <span className="tag">{PAN_TYPE_LABELS[post.pan_type]}</span>
+          {displayLinks.length > 1 && (
+            <span className="tag">{displayLinks.length} 个链接</span>
+          )}
         </div>
         <p className="mt-3 text-sm text-text-secondary">登录后查看完整链接</p>
-        <div className="mt-2 break-all rounded-md bg-bg-elevated px-3 py-2 text-xs text-text-muted">
-          {post.masked_pan_url || post.pan_url}
-        </div>
+        {renderMaskedLinks()}
         <Link href="/login" className="btn-primary mt-4">
           登录查看
         </Link>
@@ -151,11 +174,11 @@ export default function ResourceCard({ post, currentUser }: ResourceCardProps) {
     );
   }
 
-  // 有权限查看（含已解锁）
+  // 有权限查看（含已解锁）— 展示所有链接
   return (
     <div className="card p-5">
       <div className="flex items-center gap-2">
-        <span className="tag">{PAN_TYPE_LABELS[post.pan_type]}</span>
+        <span className="tag">{displayLinks.length} 个网盘链接</span>
         {unlocked && post.points_cost > 0 && (
           <span className="tag bg-purple-500/15 text-purple-300">
             <Coins size={12} className="mr-1" />
@@ -163,47 +186,68 @@ export default function ResourceCard({ post, currentUser }: ResourceCardProps) {
           </span>
         )}
       </div>
-      <div className="mt-3">
-        <div className="text-xs text-text-dim">网盘链接</div>
-        <div className="mt-1 flex items-center gap-2">
-          <code className="flex-1 break-all rounded-md bg-bg-elevated px-3 py-2 text-sm text-text-primary">
-            {post.pan_url}
-          </code>
-          <button
-            onClick={() => copy(post.pan_url, '链接')}
-            className="btn-secondary shrink-0"
-            aria-label="复制链接"
-          >
-            <Copy size={14} />
-          </button>
-        </div>
-      </div>
-      {post.pan_code && (
-        <div className="mt-3">
-          <div className="text-xs text-text-dim">提取码</div>
-          <div className="mt-1 flex items-center gap-2">
-            <code className="flex-1 break-all rounded-md bg-bg-elevated px-3 py-2 text-sm text-text-primary">
-              {post.pan_code}
-            </code>
-            <button
-              onClick={() => copy(post.pan_code, '提取码')}
-              className="btn-secondary shrink-0"
-              aria-label="复制提取码"
+
+      {/* 多链接列表 */}
+      <div className="mt-3 space-y-4">
+        {displayLinks.map((link, idx) => (
+          <div key={idx} className="rounded-lg border border-border bg-bg-surface/50 p-3">
+            {/* 链接标题 */}
+            <div className="mb-2 flex items-center gap-2">
+              <span className="tag bg-primary-500/15 text-primary-300">
+                {PAN_TYPE_LABELS[link.type]}
+              </span>
+              <span className="text-xs text-text-dim">链接 {idx + 1}</span>
+            </div>
+
+            {/* 网盘链接 */}
+            <div>
+              <div className="text-xs text-text-dim">网盘链接</div>
+              <div className="mt-1 flex items-center gap-2">
+                <code className="flex-1 break-all rounded-md bg-bg-elevated px-3 py-2 text-sm text-text-primary">
+                  {link.url}
+                </code>
+                <button
+                  onClick={() => copy(link.url, `${PAN_TYPE_LABELS[link.type]}链接`)}
+                  className="btn-secondary shrink-0"
+                  aria-label="复制链接"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* 提取码 */}
+            {link.code && (
+              <div className="mt-2">
+                <div className="text-xs text-text-dim">提取码</div>
+                <div className="mt-1 flex items-center gap-2">
+                  <code className="flex-1 break-all rounded-md bg-bg-elevated px-3 py-2 text-sm text-text-primary">
+                    {link.code}
+                  </code>
+                  <button
+                    onClick={() => copy(link.code, `${PAN_TYPE_LABELS[link.type]}提取码`)}
+                    className="btn-secondary shrink-0"
+                    aria-label="复制提取码"
+                  >
+                    <Copy size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 打开链接按钮 */}
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary mt-3 w-full"
             >
-              <Copy size={14} />
-            </button>
+              <ExternalLink size={14} />
+              打开{PAN_TYPE_LABELS[link.type]}链接
+            </a>
           </div>
-        </div>
-      )}
-      <a
-        href={post.pan_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="btn-primary mt-4"
-      >
-        <ExternalLink size={16} />
-        打开链接
-      </a>
+        ))}
+      </div>
     </div>
   );
 

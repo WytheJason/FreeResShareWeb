@@ -2,7 +2,8 @@
 
 /**
  * 发布资源页（客户端组件）
- * - 表单字段：title / description / category / pan_type / pan_url / pan_code / cover_url / is_vip
+ * - 表单字段：title / description / category / pan_links / cover_url / is_vip
+ * - 支持同时添加多个网盘链接（百度/阿里/夸克）
  * - 顶部违规警示框
  * - 封面图上传（Supabase Storage）+ 预览 + 使用默认封面
  * - VIP 加密开关
@@ -20,12 +21,15 @@ import {
   Image as ImageIcon,
   AlertTriangle,
   Coins,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import { getSupabaseBrowser } from '@/lib/supabase';
 import { isValidPanCode } from '@/lib/utils';
 import type {
   PostCategory,
   PanType,
+  PanLink,
   PostForm,
   UserProfile,
 } from '@/lib/types';
@@ -62,13 +66,37 @@ export default function PublishPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<PostCategory>('software');
-  const [panType, setPanType] = useState<PanType>('baidu');
-  const [panUrl, setPanUrl] = useState('');
-  const [panCode, setPanCode] = useState('');
+  // 多网盘链接列表（至少 1 条，最多 5 条）
+  const [panLinks, setPanLinks] = useState<PanLink[]>([
+    { type: 'baidu', url: '', code: '' },
+  ]);
   const [coverUrl, setCoverUrl] = useState('');
   const [isVip, setIsVip] = useState(false);
   const [pointsCost, setPointsCost] = useState(0);
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+
+  const MAX_LINKS = 5;
+
+  // 添加一个网盘链接
+  function addPanLink() {
+    if (panLinks.length >= MAX_LINKS) return;
+    setPanLinks([...panLinks, { type: 'baidu', url: '', code: '' }]);
+  }
+
+  // 删除指定索引的网盘链接
+  function removePanLink(index: number) {
+    if (panLinks.length <= 1) return;
+    setPanLinks(panLinks.filter((_, i) => i !== index));
+  }
+
+  // 更新指定索引的网盘链接
+  function updatePanLink(index: number, field: keyof PanLink, value: string) {
+    setPanLinks(
+      panLinks.map((link, i) =>
+        i === index ? { ...link, [field]: value } : link
+      )
+    );
+  }
 
   // 获取当前登录用户（用于封面上传路径与 VIP 提示）
   // 未登录时自动跳转到登录页
@@ -182,28 +210,45 @@ export default function PublishPage() {
       toast.show('error', '简介最多 2000 字');
       return;
     }
-    if (!panUrl.trim()) {
-      toast.show('error', '请填写网盘链接');
-      return;
+
+    // 校验多网盘链接：至少 1 条有效链接
+    const validLinks: PanLink[] = [];
+    for (let i = 0; i < panLinks.length; i++) {
+      const link = panLinks[i];
+      const url = link.url.trim();
+      const code = link.code.trim();
+      if (!url) {
+        toast.show('error', `第 ${i + 1} 条网盘链接不能为空`);
+        return;
+      }
+      if (!isPanUrlLikelyValid(link.type, url)) {
+        toast.show('error', `第 ${i + 1} 条链接格式不正确，请确认是${PAN_TYPE_LABELS[link.type]}的链接`);
+        return;
+      }
+      if (!isValidPanCode(code)) {
+        toast.show('error', `第 ${i + 1} 条链接的提取码格式不正确（0-8 位字母数字）`);
+        return;
+      }
+      validLinks.push({ type: link.type, url, code });
     }
-    if (!isPanUrlLikelyValid(panType, panUrl)) {
-      toast.show('error', `网盘链接格式不正确，请确认是${PAN_TYPE_LABELS[panType]}的链接`);
-      return;
-    }
-    if (!isValidPanCode(panCode)) {
-      toast.show('error', '提取码格式不正确（0-8 位字母数字）');
+
+    if (validLinks.length === 0) {
+      toast.show('error', '请至少填写一条网盘链接');
       return;
     }
 
     // 2. 构造表单数据
+    // pan_type/pan_url/pan_code 取第一条链接（向后兼容旧逻辑）
+    const firstLink = validLinks[0];
     const form: PostForm = {
       title: safeTitle,
       description: description.trim(),
       cover_url: coverUrl.trim(),
       category,
-      pan_type: panType,
-      pan_url: panUrl.trim(),
-      pan_code: panCode.trim(),
+      pan_type: firstLink.type,
+      pan_url: firstLink.url,
+      pan_code: firstLink.code,
+      pan_links: validLinks,
       is_vip: isVip,
       points_cost: Math.max(0, Math.min(100, Number(pointsCost) || 0)),
     };
@@ -351,67 +396,95 @@ export default function PublishPage() {
             </div>
           </div>
 
-          {/* 网盘类型 */}
+          {/* 网盘链接（支持多条） */}
           <div>
-            <label className="mb-1 block text-xs text-text-muted">
-              网盘类型 <span className="text-danger">*</span>
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(
-                Object.entries(PAN_TYPE_LABELS) as [PanType, string][]
-              ).map(([value, label]) => {
-                const active = panType === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setPanType(value)}
-                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-all ${
-                      active
-                        ? 'border-primary-500 bg-primary-500/15 text-primary-300'
-                        : 'border-border bg-bg-surface text-text-secondary hover:border-primary-500/50'
-                    }`}
-                    aria-pressed={active}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-xs text-text-muted">
+                网盘链接 <span className="text-danger">*</span>
+                <span className="ml-1 text-text-dim">（最多 {MAX_LINKS} 条，至少 1 条）</span>
+              </label>
+              {panLinks.length < MAX_LINKS && (
+                <button
+                  type="button"
+                  onClick={addPanLink}
+                  className="inline-flex items-center gap-1 rounded-md border border-primary-500/50 px-2 py-1 text-xs text-primary-300 transition-colors hover:bg-primary-500/10"
+                >
+                  <Plus size={12} />
+                  添加链接
+                </button>
+              )}
             </div>
-          </div>
 
-          {/* 网盘链接 */}
-          <div>
-            <label className="mb-1 block text-xs text-text-muted">
-              网盘链接 <span className="text-danger">*</span>
-            </label>
-            <input
-              type="url"
-              value={panUrl}
-              onChange={(e) => setPanUrl(e.target.value)}
-              placeholder={`请粘贴${PAN_TYPE_LABELS[panType]}分享链接`}
-              className="input-field"
-              required
-            />
-            <p className="mt-1 text-xs text-text-dim">
-              当前类型：{PAN_TYPE_LABELS[panType]}，链接需包含对应域名
-            </p>
-          </div>
+            {/* 多链接列表 */}
+            <div className="space-y-3">
+              {panLinks.map((link, index) => (
+                <div
+                  key={index}
+                  className="rounded-lg border border-border bg-bg-surface p-3"
+                >
+                  {/* 链接头部：序号 + 网盘类型选择 + 删除按钮 */}
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-medium text-text-secondary">
+                      链接 {index + 1}
+                    </span>
+                    {panLinks.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removePanLink(index)}
+                        className="text-text-dim transition-colors hover:text-danger"
+                        aria-label="删除此链接"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
 
-          {/* 提取码 */}
-          <div>
-            <label className="mb-1 block text-xs text-text-muted">
-              提取码
-              <span className="ml-1 text-text-dim">（选填，0-8 位字母数字）</span>
-            </label>
-            <input
-              type="text"
-              value={panCode}
-              onChange={(e) => setPanCode(e.target.value)}
-              maxLength={8}
-              placeholder="如 abcd1234"
-              className="input-field"
-            />
+                  {/* 网盘类型选择 */}
+                  <div className="mb-2 grid grid-cols-3 gap-1.5">
+                    {(
+                      Object.entries(PAN_TYPE_LABELS) as [PanType, string][]
+                    ).map(([value, label]) => {
+                      const active = link.type === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => updatePanLink(index, 'type', value)}
+                          className={`rounded-md border px-2 py-1.5 text-xs font-medium transition-all ${
+                            active
+                              ? 'border-primary-500 bg-primary-500/15 text-primary-300'
+                              : 'border-border bg-bg-elevated text-text-secondary hover:border-primary-500/50'
+                          }`}
+                          aria-pressed={active}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* 网盘链接输入 */}
+                  <input
+                    type="url"
+                    value={link.url}
+                    onChange={(e) => updatePanLink(index, 'url', e.target.value)}
+                    placeholder={`请粘贴${PAN_TYPE_LABELS[link.type]}分享链接`}
+                    className="input-field mb-2"
+                    required
+                  />
+
+                  {/* 提取码输入 */}
+                  <input
+                    type="text"
+                    value={link.code}
+                    onChange={(e) => updatePanLink(index, 'code', e.target.value)}
+                    maxLength={8}
+                    placeholder="提取码（选填，0-8 位字母数字）"
+                    className="input-field"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* 封面图 */}
