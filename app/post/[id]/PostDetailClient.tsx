@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation';
 import { Star, StarOff, Flag, Edit, Trash2, ChevronRight, X } from 'lucide-react';
 import type { PostDetail, Comment, PageResult, UserProfile } from '@/lib/types';
 import { useToast } from '@/components/Toast';
+import AdBanner from '@/components/AdBanner';
 import PostHeader from './PostHeader';
 import ResourceCard from './ResourceCard';
 import CommentSection from './CommentSection';
@@ -139,6 +140,9 @@ export default function PostDetailClient({
       {/* 帖子主体 */}
       <PostHeader post={post} />
 
+      {/* 广告位：帖子下方 */}
+      <AdBanner />
+
       {/* 网盘资源 */}
       <section>
         <h2 className="section-title mb-3">网盘资源</h2>
@@ -170,6 +174,9 @@ export default function PostDetailClient({
           )}
         </div>
       )}
+
+      {/* 广告位：资源与评论之间 */}
+      <AdBanner />
 
       {/* 评论区 */}
       <CommentSection

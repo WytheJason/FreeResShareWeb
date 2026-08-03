@@ -17,6 +17,7 @@ import { Pin, Clock, Flame, ArrowRight, ShieldCheck } from 'lucide-react';
 import { getSupabaseServiceAdmin } from '@/lib/supabase-server';
 import { maskPanUrl, maskPanCode } from '@/lib/security';
 import { calcPageRange, calcTotalPages } from '@/lib/utils';
+import AdBanner from '@/components/AdBanner';
 import type {
   Post,
   PostCategory,
@@ -315,6 +316,9 @@ export default async function HomePage({
           currentSearch={currentSearch}
         />
 
+        {/* 广告位：搜索结果页 */}
+        <AdBanner />
+
         {/* 列表视图标题 */}
         <div className="flex items-center justify-between">
           <h2 className="section-title text-lg">
@@ -365,8 +369,11 @@ export default async function HomePage({
       {/* Hero 区 */}
       <Hero />
 
-      {/* 搜索框 */}
+        {/* 搜索框 */}
       <SearchBox currentSearch={currentSearch} />
+
+      {/* 广告位：首页 Hero 下方 */}
+      <AdBanner />
 
       {/* 置顶资源 */}
       <section>
@@ -397,6 +404,9 @@ export default async function HomePage({
           <Empty text="暂无资源" />
         )}
       </section>
+
+      {/* 广告位：最新与热门之间 */}
+      <AdBanner />
 
       {/* 热门资源 */}
       <section>
