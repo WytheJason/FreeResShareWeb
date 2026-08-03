@@ -53,6 +53,7 @@ export default function ResourceCard({ post, currentUser }: ResourceCardProps) {
             className="break-all rounded-md bg-bg-elevated px-3 py-2 text-xs text-text-muted"
           >
             <span className="mr-2 text-text-dim">[{PAN_TYPE_LABELS[link.type]}]</span>
+            {link.label && <span className="mr-1 text-secondary-300">[{link.label}]</span>}
             {link.url}
           </div>
         ))}
@@ -196,6 +197,11 @@ export default function ResourceCard({ post, currentUser }: ResourceCardProps) {
               <span className="tag bg-primary-500/15 text-primary-300">
                 {PAN_TYPE_LABELS[link.type]}
               </span>
+              {link.label && (
+                <span className="tag bg-secondary-500/15 text-secondary-300">
+                  {link.label}
+                </span>
+              )}
               <span className="text-xs text-text-dim">链接 {idx + 1}</span>
             </div>
 

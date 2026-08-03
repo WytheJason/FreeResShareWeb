@@ -17,6 +17,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import type { UserProfile } from '@/lib/types';
 import { getSupabaseBrowser } from '@/lib/supabase';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
+import Avatar from '@/components/Avatar';
 
 interface NavItem {
   label: string;
@@ -182,18 +183,11 @@ export default function Navbar() {
                 onClick={() => setUserMenuOpen((v) => !v)}
                 className="flex items-center gap-2 rounded-lg p-1 transition-colors hover:bg-bg-hover"
               >
-                {user.avatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={user.avatar}
-                    alt={user.nickname}
-                    className="h-8 w-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="grid h-8 w-8 place-items-center rounded-full bg-primary-500/20 text-primary-300">
-                    <User size={16} />
-                  </div>
-                )}
+                <Avatar
+                  src={user.avatar}
+                  name={user.nickname || user.email}
+                  className="h-8 w-8"
+                />
                 <span className="max-w-[6rem] truncate text-sm text-text-primary">
                   {user.nickname || user.email}
                 </span>

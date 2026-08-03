@@ -97,6 +97,8 @@ export interface PanLink {
   url: string;
   /** 提取码（可为空） */
   code: string;
+  /** 规格/版本标签（如：4K版、标准版、iOS版等） */
+  label?: string;
 }
 
 // ============ 帖子状态 ============
@@ -158,6 +160,8 @@ export interface Post {
   /** 多网盘链接列表（详情页加载，列表页可能不加载） */
   pan_links?: PanLink[] | null;
   is_vip: boolean;
+  /** 是否需要登录才能查看（undefined/true=需登录，false=任何人可查看） */
+  need_login?: boolean;
   is_top: boolean;
   hot_weight: number;
   status: PostStatus;
@@ -301,6 +305,8 @@ export interface PostForm {
   /** 多网盘链接列表（发布时提交） */
   pan_links: PanLink[];
   is_vip: boolean;
+  /** 是否需要登录才能查看（undefined 或 true = 需登录，false = 任何人可查看） */
+  need_login?: boolean;
   /** 查看资源所需积分（0=免费），范围 0-100 */
   points_cost: number;
 }
@@ -310,6 +316,13 @@ export const PAN_TYPE_LABELS: Record<PanType, string> = {
   baidu: '百度网盘',
   aliyun: '阿里云盘',
   quark: '夸克网盘',
+};
+
+// ============ 网盘类型图标路径 ============
+export const PAN_TYPE_ICONS: Record<PanType, string> = {
+  baidu: '/icons/pan-baidu.svg',
+  aliyun: '/icons/pan-aliyun.svg',
+  quark: '/icons/pan-quark.svg',
 };
 
 // ============ 帖子分类标签映射 ============

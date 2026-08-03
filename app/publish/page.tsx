@@ -23,6 +23,7 @@ import {
   Coins,
   Plus,
   Trash2,
+  Lock,
 } from 'lucide-react';
 import { getSupabaseBrowser } from '@/lib/supabase';
 import { isValidPanCode } from '@/lib/utils';
@@ -72,6 +73,7 @@ export default function PublishPage() {
   ]);
   const [coverUrl, setCoverUrl] = useState('');
   const [isVip, setIsVip] = useState(false);
+  const [needLogin, setNeedLogin] = useState(true);
   const [pointsCost, setPointsCost] = useState(0);
   const turnstileRef = useRef<TurnstileWidgetHandle>(null);
 
@@ -250,6 +252,7 @@ export default function PublishPage() {
       pan_code: firstLink.code,
       pan_links: validLinks,
       is_vip: isVip,
+      need_login: needLogin,
       points_cost: Math.max(0, Math.min(100, Number(pointsCost) || 0)),
     };
 
@@ -480,6 +483,16 @@ export default function PublishPage() {
                     onChange={(e) => updatePanLink(index, 'code', e.target.value)}
                     maxLength={8}
                     placeholder="提取码（选填，0-8 位字母数字）"
+                    className="input-field mb-2"
+                  />
+
+                  {/* 规格标签输入 */}
+                  <input
+                    type="text"
+                    value={link.label || ''}
+                    onChange={(e) => updatePanLink(index, 'label', e.target.value)}
+                    maxLength={20}
+                    placeholder="规格/版本标签（选填，如：4K版、标准版、iOS版）"
                     className="input-field"
                   />
                 </div>
@@ -573,6 +586,36 @@ export default function PublishPage() {
               <span
                 className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
                   isVip ? 'translate-x-5' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* 需要登录查看开关 */}
+          <div className="flex items-start justify-between rounded-lg border border-border bg-bg-surface px-4 py-3">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <Lock size={14} className="text-blue-400" />
+                <span className="text-sm font-medium text-text-primary">
+                  需要登录查看
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-text-muted">
+                关闭后访客无需登录即可查看资源链接，开启后需登录
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={needLogin}
+              onClick={() => setNeedLogin((v) => !v)}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                needLogin ? 'bg-blue-500' : 'bg-border-subtle'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  needLogin ? 'translate-x-5' : 'translate-x-0.5'
                 }`}
               />
             </button>

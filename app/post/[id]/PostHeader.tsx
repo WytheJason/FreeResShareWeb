@@ -1,12 +1,13 @@
 /**
- * 帖子主体展示卡片（封面/标题/标签/作者/简介）
+ * 帖子主体展示卡片（封面/标题/标签/网盘类型/作者/简介）
  * 纯展示组件，由 PostDetailClient 调用
  */
 
-import { Eye, MessageCircle, Pin, Crown, Coins } from 'lucide-react';
+import { Eye, MessageCircle, Pin, Crown, Coins, Unlock } from 'lucide-react';
 import type { PostDetail } from '@/lib/types';
-import { CATEGORY_LABELS } from '@/lib/types';
+import { CATEGORY_LABELS, PAN_TYPE_ICONS, PAN_TYPE_LABELS } from '@/lib/types';
 import { formatDateTime, formatRelativeTime } from '@/lib/utils';
+import Avatar from '@/components/Avatar';
 
 interface PostHeaderProps {
   post: PostDetail;
@@ -14,6 +15,7 @@ interface PostHeaderProps {
 
 export default function PostHeader({ post }: PostHeaderProps) {
   const categoryLabel = CATEGORY_LABELS[post.category];
+  const panIconUrl = PAN_TYPE_ICONS[post.pan_type];
 
   return (
     <div className="card overflow-hidden">
@@ -42,6 +44,19 @@ export default function PostHeader({ post }: PostHeaderProps) {
           <span className={`tag ${post.category === 'software' ? 'tag-software' : 'tag-movie'}`}>
             {categoryLabel}
           </span>
+          {/* 网盘类型标签 */}
+          <span className="tag bg-bg-elevated text-text-secondary">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={panIconUrl}
+              alt={PAN_TYPE_LABELS[post.pan_type]}
+              className="mr-1 h-3 w-3"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+            {PAN_TYPE_LABELS[post.pan_type]}
+          </span>
           {post.is_top && (
             <span className="tag bg-danger/20 text-danger">
               <Pin size={10} /> 置顶
@@ -57,6 +72,11 @@ export default function PostHeader({ post }: PostHeaderProps) {
               <Coins size={10} /> {post.points_cost}积分
             </span>
           )}
+          {post.need_login === false && (
+            <span className="tag bg-green-500/20 text-green-300">
+              <Unlock size={10} /> 公开
+            </span>
+          )}
           <span className="flex items-center gap-1">
             <Eye size={12} /> {post.view_count}
           </span>
@@ -68,18 +88,11 @@ export default function PostHeader({ post }: PostHeaderProps) {
 
         {/* 作者 */}
         <div className="mt-4 flex items-center gap-3">
-          {post.author_avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={post.author_avatar}
-              alt={post.author_nickname}
-              className="h-10 w-10 rounded-full object-cover"
-            />
-          ) : (
-            <div className="grid h-10 w-10 place-items-center rounded-full bg-primary-500/20 text-sm text-primary-300">
-              {(post.author_nickname || 'U').charAt(0).toUpperCase()}
-            </div>
-          )}
+          <Avatar
+            src={post.author_avatar}
+            name={post.author_nickname}
+            className="h-10 w-10"
+          />
           <div>
             <div className="text-sm font-medium text-text-primary">
               {post.author_nickname || '匿名'}

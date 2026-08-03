@@ -48,6 +48,7 @@ import VipBadge from '@/components/VipBadge';
 import TurnstileWidget, { type TurnstileWidgetHandle } from '@/components/TurnstileWidget';
 import PointsPanel from './PointsPanel';
 import { useToast } from '@/components/Toast';
+import Avatar from '@/components/Avatar';
 
 export type TabKey = 'posts' | 'comments' | 'collects' | 'history' | 'points';
 
@@ -405,18 +406,11 @@ export default function UserCenterClient({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center relative">
           {/* 头像 */}
           <div className="relative">
-            {profile.avatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={profile.avatar}
-                alt={profile.nickname}
-                className="h-24 w-24 rounded-2xl object-cover ring-2 ring-primary-500/30"
-              />
-            ) : (
-              <div className="grid h-24 w-24 place-items-center rounded-2xl bg-gradient-to-br from-primary-500/30 to-primary-700/30 text-3xl font-bold text-primary-300">
-                {(profile.nickname || 'U').charAt(0).toUpperCase()}
-              </div>
-            )}
+            <Avatar
+              src={profile.avatar}
+              name={profile.nickname}
+              className="h-24 w-24 rounded-2xl ring-2 ring-primary-500/30"
+            />
             {/* 管理员徽标 */}
             {profile.is_admin && (
               <div className="absolute -right-1 -bottom-1 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white shadow">

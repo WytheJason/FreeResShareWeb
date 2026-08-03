@@ -89,8 +89,12 @@ export async function GET(request: Request) {
         canViewLink = isUnlocked;
         canViewCode = isUnlocked;
       }
+    } else if ((post as any).need_login === false) {
+      // 公开资源：任何人可查看
+      canViewLink = true;
+      canViewCode = true;
     } else {
-      // 公开资源
+      // 需登录资源
       canViewLink = canViewPublicResource(user);
       canViewCode = canViewPublicResource(user);
     }

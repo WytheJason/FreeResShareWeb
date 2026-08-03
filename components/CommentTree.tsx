@@ -4,6 +4,7 @@ import { Trash2, MessageSquare } from 'lucide-react';
 import type { Comment } from '@/lib/types';
 import { formatRelativeTime } from '@/lib/utils';
 import Empty from './Empty';
+import Avatar from './Avatar';
 
 interface CommentTreeProps {
   /** 评论列表（树形结构） */
@@ -66,18 +67,11 @@ function CommentNode({
     <li className="rounded-lg p-3 transition-colors hover:bg-bg-hover/40">
       <div className="flex gap-3">
         {/* 头像 */}
-        {comment.user_avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={comment.user_avatar}
-            alt={comment.user_nickname}
-            className="h-8 w-8 shrink-0 rounded-full object-cover"
-          />
-        ) : (
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary-500/20 text-xs text-primary-300">
-            {(comment.user_nickname || 'U').charAt(0).toUpperCase()}
-          </div>
-        )}
+        <Avatar
+          src={comment.user_avatar}
+          name={comment.user_nickname}
+          className="h-8 w-8 shrink-0"
+        />
 
         {/* 内容区 */}
         <div className="min-w-0 flex-1">

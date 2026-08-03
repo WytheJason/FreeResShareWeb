@@ -43,6 +43,7 @@ interface PostRaw {
   pan_code: string;
   pan_links: PanLink[] | null;
   is_vip: boolean;
+  need_login?: boolean;
   is_top: boolean;
   hot_weight: number;
   status: PostStatus;
@@ -132,7 +133,9 @@ export default async function PostDetailPage({
 
   // 积分资源（points_cost > 0）：需要积分解锁后才能查看
   // VIP 资源（is_vip=true）：VIP 会员或作者可查看
-  // 普通资源：登录用户可查看
+  // 需登录资源（need_login=true）：登录用户可查看
+  // 公开资源（need_login=false）：任何人可查看
+  const needLogin = (raw as any).need_login !== false;
   if (raw.points_cost > 0) {
     // 作者无需解锁
     if (isAuthor) {
@@ -154,7 +157,12 @@ export default async function PostDetailPage({
   } else if (raw.is_vip) {
     canViewLink = canViewVipResource(currentUser, raw.author_id);
     canViewCode = canViewVipResource(currentUser, raw.author_id);
+  } else if (!needLogin) {
+    // 公开资源：任何人可查看
+    canViewLink = true;
+    canViewCode = true;
   } else {
+    // 需登录资源：登录用户可查看
     canViewLink = canViewPublicResource(currentUser);
     canViewCode = canViewPublicResource(currentUser);
   }

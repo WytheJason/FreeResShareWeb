@@ -1,8 +1,9 @@
 import Link from 'next/link';
-import { Eye, MessageCircle, Crown, Pin, Coins } from 'lucide-react';
+import { Eye, MessageCircle, Crown, Pin, Coins, Unlock } from 'lucide-react';
 import type { Post } from '@/lib/types';
-import { CATEGORY_LABELS } from '@/lib/types';
+import { CATEGORY_LABELS, PAN_TYPE_ICONS, PAN_TYPE_LABELS } from '@/lib/types';
 import { formatRelativeTime } from '@/lib/utils';
+import Avatar from './Avatar';
 
 interface PostCardProps {
   post: Post;
@@ -11,11 +12,13 @@ interface PostCardProps {
 /**
  * 帖子卡片
  * 整卡可点击跳转 /post/[id]
- * 顶部封面图（无图渐变占位）+ 标题 + 简介 + 作者/浏览/评论信息
+ * 顶部封面图（无图渐变占位）+ 标题 + 简介 + 网盘类型图标 + 作者/浏览/评论信息
  */
 export default function PostCard({ post }: PostCardProps) {
   const categoryTagCls =
     post.category === 'software' ? 'tag tag-software' : 'tag tag-movie';
+
+  const panIconUrl = PAN_TYPE_ICONS[post.pan_type];
 
   return (
     <Link
@@ -42,6 +45,20 @@ export default function PostCard({ post }: PostCardProps) {
           {CATEGORY_LABELS[post.category]}
         </span>
 
+        {/* 网盘类型标签 - 分类下方 */}
+        <span className="absolute left-2 top-9 flex items-center gap-1 rounded-md bg-bg-base/70 px-1.5 py-0.5 text-[10px] text-text-secondary backdrop-blur-sm">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={panIconUrl}
+            alt={PAN_TYPE_LABELS[post.pan_type]}
+            className="h-3 w-3"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+          {PAN_TYPE_LABELS[post.pan_type]}
+        </span>
+
         {/* 置顶 / VIP / 积分 标签 - 右上角 */}
         <div className="absolute right-2 top-2 flex gap-1">
           {post.is_top && (
@@ -62,6 +79,12 @@ export default function PostCard({ post }: PostCardProps) {
               {post.points_cost}积分
             </span>
           )}
+          {post.need_login === false && (
+            <span className="tag bg-green-500/20 text-green-300">
+              <Unlock size={10} />
+              公开
+            </span>
+          )}
         </div>
       </div>
 
@@ -79,18 +102,11 @@ export default function PostCard({ post }: PostCardProps) {
         {/* 底部信息 */}
         <div className="mt-3 flex items-center justify-between text-xs text-text-dim">
           <div className="flex min-w-0 items-center gap-2">
-            {post.author_avatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={post.author_avatar}
-                alt={post.author_nickname}
-                className="h-5 w-5 shrink-0 rounded-full object-cover"
-              />
-            ) : (
-              <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary-500/20 text-[10px] text-primary-300">
-                {(post.author_nickname || 'U').charAt(0).toUpperCase()}
-              </div>
-            )}
+            <Avatar
+              src={post.author_avatar}
+              name={post.author_nickname}
+              className="h-5 w-5 shrink-0"
+            />
             <span className="max-w-[6rem] truncate">{post.author_nickname || '匿名'}</span>
             <span>·</span>
             <span className="shrink-0">{formatRelativeTime(post.created_at)}</span>

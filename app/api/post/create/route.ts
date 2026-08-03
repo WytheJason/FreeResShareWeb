@@ -42,6 +42,7 @@ export async function POST(request: Request) {
       pan_code,
       pan_links,
       is_vip,
+      need_login,
       points_cost,
       captcha,
     } = body as PostForm & { captcha: CaptchaTicket };
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
       // ---------- 4.1 多网盘链接校验 ----------
       // pan_links 为数组，至少 1 条，最多 5 条
       // 兼容旧逻辑：若未传 pan_links，则用 pan_type/pan_url/pan_code 构造
-      let validatedLinks: Array<{ type: PanType; url: string; code: string }> = [];
+      let validatedLinks: Array<{ type: PanType; url: string; code: string; label?: string }> = [];
 
       if (Array.isArray(pan_links) && pan_links.length > 0) {
         if (pan_links.length > 5) {
@@ -134,6 +135,7 @@ export async function POST(request: Request) {
             type: link.type,
             url: link.url.trim(),
             code: (link.code ?? '').trim(),
+            label: (link.label ?? '').trim() || undefined,
           });
         }
       } else {
@@ -190,6 +192,7 @@ export async function POST(request: Request) {
           pan_code: primaryLink.code,
           pan_links: validatedLinks,
           is_vip: !!is_vip,
+          need_login: need_login !== false,
           points_cost: safePointsCost,
           author_id: user.id,
           status: 'normal',
